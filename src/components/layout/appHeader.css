@@ -1,0 +1,242 @@
+/* ==========================================================
+   HEADER
+========================================================== */
+
+.app-header {
+
+    position: relative;
+    z-index: 1000;
+
+    height: 82px;
+
+     line-height: normal;      /* Add this */
+
+    padding: 0 35px;
+
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: center;
+
+    background: rgba(17,24,39,.92) !important;
+
+    backdrop-filter: blur(18px);
+
+    border-bottom: 1px solid rgba(255,255,255,.08);
+
+    box-shadow:
+        0 8px 25px rgba(0,0,0,.35);
+}
+
+/* ==========================================================
+   LEFT
+========================================================== */
+
+.header-left {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 16px;
+}
+
+.logo-box {
+    flex-shrink: 0;
+
+
+    width: 54px;
+
+    height: 54px;
+
+    border-radius: 18px;
+
+    display: flex;
+
+    justify-content: center;
+
+    align-items: center;
+
+    color: white;
+
+    font-size: 24px;
+
+    background:
+        linear-gradient(135deg,
+            #4f7cff,
+            #7c3aed);
+
+    box-shadow:
+        0 12px 28px rgba(79,124,255,.35);
+}
+
+.app-title {
+
+    color: white !important;
+
+    margin: 0 !important;
+    line-height: 1.1 !important;
+
+    font-weight: 700;
+}
+
+.app-subtitle {
+
+    color: #94a3b8;
+
+    font-size: 13px;
+
+    display: block;
+    margin-top: 2px;
+
+}
+
+/* ==========================================================
+   PROFILE
+========================================================== */
+
+.profile-box {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 12px;
+
+    padding: 10px 16px;
+
+    border-radius: 16px;
+
+    background: rgba(30,41,59,.85);
+
+    border: 1px solid rgba(255,255,255,.05);
+}
+
+.profile-avatar {
+
+    background:
+        linear-gradient(135deg,
+            #4f7cff,
+            #2563eb);
+
+    color: white;
+}
+
+.welcome-text {
+
+    display: block;
+
+    color: #94a3b8;
+
+    font-size: 12px;
+}
+
+.username {
+
+    color: white;
+
+    font-size: 15px;
+
+    font-weight: 600;
+}
+
+/* ==========================================================
+   BUTTON
+========================================================== */
+
+.logout-btn {
+
+    height: 46px;
+
+    padding: 0 22px;
+
+    border-radius: 14px;
+
+    font-weight: 600;
+
+    transition: .3s;
+}
+
+.logout-btn:hover {
+
+    transform: translateY(-2px);
+
+    box-shadow:
+        0 10px 20px rgba(255,77,79,.25);
+}
+
+/* ==========================================================
+   MOBILE
+========================================================== */
+
+@media(max-width:768px){
+
+    .app-header{
+
+        padding:0 18px;
+    }
+
+    .app-subtitle{
+
+        display:none;
+    }
+
+    .profile-box{
+
+        padding:8px 10px;
+    }
+
+    .username{
+
+        display:none;
+    }
+
+    .welcome-text{
+
+        display:none;
+    }
+
+    .logout-btn{
+
+        padding:0 14px;
+    }
+}
+
+@media(max-width:576px){
+
+    .logo-box{
+
+        width:46px;
+
+        height:46px;
+
+        font-size:20px;
+    }
+
+    .app-title{
+
+        font-size:18px !important;
+    }
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.profile-box {
+    display: flex;
+    align-items: center;
+
+    flex-shrink: 0;
+
+    height: 66px;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    height: 100%;
+}
