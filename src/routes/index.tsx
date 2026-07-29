@@ -1,15 +1,20 @@
+import { Spin } from 'antd';
+import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
-import ChatScreen from '../components/features/Chat/ChatScreen';
-import Dashboard from '../components/features/Dashboard/Dashboard';
-import GroupDetails from '../components/features/Group/GroupDetails';
-import Login from '../components/features/Auth/Login';
-import Register from '../components/features/Auth/Register';
-import NotFound from '../components/errors/404';
 import PrivateRoute from './PrivateRoute';
+
+const ChatScreen = lazy(() => import('../components/features/Chat/ChatScreen'));
+const Dashboard = lazy(() => import('../components/features/Dashboard/Dashboard'));
+const DirectChatScreen = lazy(() => import('../components/features/DirectChat/DirectChatScreen'));
+const GroupDetails = lazy(() => import('../components/features/Group/GroupDetails'));
+const Login = lazy(() => import('../components/features/Auth/Login'));
+const Register = lazy(() => import('../components/features/Auth/Register'));
+const NotFound = lazy(() => import('../components/errors/404'));
 
 const AppRoutes = () => {
   return (
-    <Routes>
+    <Suspense fallback={<div className="route-loader"><Spin size="large" /></div>}>
+      <Routes>
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
@@ -37,8 +42,17 @@ const AppRoutes = () => {
           </PrivateRoute>
         }
       />
+      <Route
+        path="/messages/:userId"
+        element={
+          <PrivateRoute>
+            <DirectChatScreen />
+          </PrivateRoute>
+        }
+      />
       <Route path="*" element={<NotFound />} />
-    </Routes>
+      </Routes>
+    </Suspense>
   );
 };
 

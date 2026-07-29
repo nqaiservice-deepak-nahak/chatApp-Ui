@@ -8,6 +8,7 @@ export const API_ENDPOINTS = {
   REGISTER: '/auth/register',
   LOGIN: '/auth/login',
   PROFILE: '/auth/me',
+  AVAILABLE_USERS: '/auth/available-users',
   //#endregion AUTH
 
   //#region GROUPS
@@ -19,6 +20,8 @@ export const API_ENDPOINTS = {
   //#endregion GROUPS
 
   //#region MESSAGES
-  CHAT_HISTORY: (groupId: string) => `/groups/${groupId}/messages`
+  CHAT_HISTORY: (groupId: string) => `/groups/${groupId}/messages`,
+  PRIVATE_CHAT_HISTORY: (userId: string) => `/messages/private/${userId}`,
+  SEND_PRIVATE_MESSAGE: (userId: string) => `/messages/private/${userId}`
   //#endregion MESSAGES
 };

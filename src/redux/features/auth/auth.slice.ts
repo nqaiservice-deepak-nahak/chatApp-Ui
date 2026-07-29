@@ -9,6 +9,8 @@ interface AuthState {
   accessToken: string | null;
   loginLoading: boolean;
   registerLoading: boolean;
+  usersLoading: boolean;
+  availableUsers: User[];
   error: string | null;
 }
 
@@ -17,6 +19,8 @@ const initialState: AuthState = {
   accessToken: getStoredToken(),
   loginLoading: false,
   registerLoading: false,
+  usersLoading: false,
+  availableUsers: [],
   error: null
 };
 
@@ -39,6 +43,15 @@ export const loginThunk = createAsyncThunk('auth/login', async (body: { email: s
     return res.data.data!;
   } catch (error: any) {
     return rejectWithValue(error?.response?.data?.message || 'Invalid email or password.');
+  }
+});
+
+export const fetchAvailableUsersThunk = createAsyncThunk('auth/fetchAvailableUsers', async (_: void, { rejectWithValue }) => {
+  try {
+    const res = await API.get<AppApiResponse<User[]>>(API_ENDPOINTS.AVAILABLE_USERS);
+    return res.data.data || [];
+  } catch (error: any) {
+    return rejectWithValue(error?.response?.data?.message || 'Failed to load people.');
   }
 });
 //#endregion Thunks
@@ -81,6 +94,17 @@ const authSlice = createSlice({
       })
       .addCase(loginThunk.rejected, (state, action: PayloadAction<any>) => {
         state.loginLoading = false;
+        state.error = action.payload;
+      })
+      .addCase(fetchAvailableUsersThunk.pending, (state) => {
+        state.usersLoading = true;
+      })
+      .addCase(fetchAvailableUsersThunk.fulfilled, (state, action) => {
+        state.usersLoading = false;
+        state.availableUsers = action.payload;
+      })
+      .addCase(fetchAvailableUsersThunk.rejected, (state, action: PayloadAction<any>) => {
+        state.usersLoading = false;
         state.error = action.payload;
       });
   }

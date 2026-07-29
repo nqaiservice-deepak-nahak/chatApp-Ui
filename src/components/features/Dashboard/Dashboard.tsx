@@ -18,8 +18,9 @@ import {
   PlusCircleOutlined,
   UserOutlined,
   ArrowRightOutlined,
+  SearchOutlined,
 } from "@ant-design/icons";
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AppHeader from "../../layout/AppHeader";
 
@@ -31,6 +32,7 @@ import {
 } from "../../../redux/features/groups/groups.slice";
 
 import { useAppDispatch, useAppSelector } from "../../../redux/hooks";
+import { fetchAvailableUsersThunk } from "../../../redux/features/auth/auth.slice";
 
 import "./dashboard.css";
 
@@ -51,10 +53,20 @@ export default function Dashboard() {
   } = useAppSelector((state) => state.groups);
 
   const [form] = Form.useForm();
+  const [peopleSearch, setPeopleSearch] = useState("");
+  const { user, availableUsers, usersLoading } = useAppSelector((state) => state.auth);
+  const filteredUsers = useMemo(() => {
+    const query = peopleSearch.trim().toLowerCase();
+    if (!query) return availableUsers;
+    return availableUsers.filter(
+      (person) => person.name.toLowerCase().includes(query) || person.email.toLowerCase().includes(query)
+    );
+  }, [availableUsers, peopleSearch]);
 
   useEffect(() => {
     dispatch(fetchMyGroupsThunk());
     dispatch(fetchAvailableGroupsThunk());
+    dispatch(fetchAvailableUsersThunk());
   }, [dispatch]);
 
   const handleCreateGroup = async (values: {
@@ -82,12 +94,11 @@ export default function Dashboard() {
           <div>
 
             <Title level={2}>
-              Welcome Back 👋
+              Welcome back, {user?.name || "there"}
             </Title>
 
             <Text>
-              Create groups, join communities and start chatting with your
-              friends in a beautiful workspace.
+              Continue a group conversation or connect privately with a teammate.
             </Text>
 
           </div>
@@ -106,6 +117,13 @@ export default function Dashboard() {
         )}
 
         <Row gutter={[24, 24]}>
+          <Col span={24}>
+            <div className="dashboard-stats" aria-label="Workspace overview">
+              <div className="stat-card"><strong>{myGroups.length}</strong><span>Joined groups</span></div>
+              <div className="stat-card"><strong>{availableGroups.length}</strong><span>Groups to discover</span></div>
+              <div className="stat-card"><strong>{availableUsers.length}</strong><span>People available</span></div>
+            </div>
+          </Col>
 
           {/* MY CHATS */}
 
@@ -221,6 +239,54 @@ export default function Dashboard() {
 
             </Card>
 
+          </Col>
+
+          {/* DIRECT MESSAGES */}
+
+          <Col span={24}>
+            <Card
+              className="glass-card people-card"
+              title={
+                <div className="card-title cyan">
+                  <div className="title-icon"><UserOutlined /></div>
+                  <span>Direct Messages</span>
+                </div>
+              }
+              extra={
+                <Input
+                  allowClear
+                  value={peopleSearch}
+                  onChange={(event) => setPeopleSearch(event.target.value)}
+                  prefix={<SearchOutlined />}
+                  placeholder="Search people"
+                  className="people-search"
+                  aria-label="Search people"
+                />
+              }
+            >
+              {usersLoading ? (
+                <div className="loader-box"><Spin size="large" /></div>
+              ) : filteredUsers.length === 0 ? (
+                <Empty description={peopleSearch ? "No people match your search." : "No other users are available yet."} />
+              ) : (
+                <List
+                  grid={{ gutter: 16, xs: 1, sm: 2, lg: 3 }}
+                  dataSource={filteredUsers}
+                  renderItem={(person) => (
+                    <List.Item>
+                      <button className="person-card" onClick={() => navigate(`/messages/${person.id}`)}>
+                        <div className="avatar avatar-cyan"><UserOutlined /></div>
+                        <div className="person-copy">
+                          <strong>{person.name}</strong>
+                          <span>{person.email}</span>
+                        </div>
+                        <ArrowRightOutlined className="arrow" />
+                      </button>
+                    </List.Item>
+                  )}
+                />
+              )}
+            </Card>
           </Col>
 
           {/* CREATE GROUP */}

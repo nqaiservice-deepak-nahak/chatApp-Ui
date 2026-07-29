@@ -19,10 +19,12 @@ export interface Group {
 
 export interface ChatMessage {
   _id: string;
-  groupId: string;
+  groupId?: string;
+  receiverId?: string;
   senderId: string;
   senderName: string;
   message: string;
+  messageType?: 'group' | 'private';
   createdOn: string;
 }
 
