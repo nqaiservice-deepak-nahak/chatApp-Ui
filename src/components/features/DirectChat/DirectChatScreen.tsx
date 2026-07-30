@@ -1,6 +1,6 @@
 import { ArrowLeftOutlined, SendOutlined, UserOutlined } from '@ant-design/icons';
 import { Alert, Avatar, Badge, Button, Input, Layout, Spin, Typography } from 'antd';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { UIEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { fetchAvailableUsersThunk } from '../../../redux/features/auth/auth.slice';
 import {
@@ -22,11 +22,20 @@ export default function DirectChatScreen() {
   const navigate = useNavigate();
   const currentUser = useAppSelector((state) => state.auth.user);
   const { availableUsers, usersLoading } = useAppSelector((state) => state.auth);
-  const { privateChatHistory, historyLoading, error } = useAppSelector((state) => state.messages);
+  const {
+    privateChatHistory,
+    historyLoading,
+    olderHistoryLoading,
+    privateHasMore,
+    privateNextOffset,
+    error
+  } = useAppSelector((state) => state.messages);
   const otherUser = availableUsers.find((candidate) => candidate.id === userId);
   const [draft, setDraft] = useState('');
   const [socketError, setSocketError] = useState('');
+  const contentRef = useRef<HTMLElement | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
+  const loadingOlderRef = useRef(false);
 
   const handleIncomingMessage = useCallback(
     (message: Parameters<typeof appendPrivateMessage>[0]) => dispatch(appendPrivateMessage(message)),
@@ -41,15 +50,47 @@ export default function DirectChatScreen() {
 
   useEffect(() => {
     if (!userId) return;
-    dispatch(fetchPrivateChatHistoryThunk(userId));
+    dispatch(fetchPrivateChatHistoryThunk({ userId }));
     return () => {
       dispatch(clearPrivateChatHistory());
     };
   }, [dispatch, userId]);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!loadingOlderRef.current) {
+      endRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [privateChatHistory]);
+
+  const handleHistoryScroll = async (event: UIEvent<HTMLElement>) => {
+    const container = event.currentTarget;
+    if (
+      container.scrollTop > 40 ||
+      !userId ||
+      !privateHasMore ||
+      privateNextOffset === null ||
+      olderHistoryLoading ||
+      loadingOlderRef.current
+    ) {
+      return;
+    }
+
+    loadingOlderRef.current = true;
+    const previousScrollHeight = container.scrollHeight;
+
+    try {
+      await dispatch(fetchPrivateChatHistoryThunk({ userId, offset: privateNextOffset })).unwrap();
+      requestAnimationFrame(() => {
+        const currentContainer = contentRef.current;
+        if (currentContainer) {
+          currentContainer.scrollTop = currentContainer.scrollHeight - previousScrollHeight;
+        }
+        loadingOlderRef.current = false;
+      });
+    } catch {
+      loadingOlderRef.current = false;
+    }
+  };
 
   const handleSend = () => {
     const message = draft.trim();
@@ -97,7 +138,10 @@ export default function DirectChatScreen() {
         />
       )}
 
-      <Content className="chat-content">
+      <Content ref={contentRef} className="chat-content" onScroll={handleHistoryScroll}>
+        {olderHistoryLoading && (
+          <div className="history-page-loader"><Spin size="small" /></div>
+        )}
         {historyLoading ? (
           <div className="chat-loader"><Spin size="large" /></div>
         ) : privateChatHistory.length === 0 ? (

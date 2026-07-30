@@ -859,3 +859,71 @@ body {
     .people-card .ant-card-extra,
     .people-search { width: 100%; }
 }
+
+/* Dynamic dashboard controls and fluid panels */
+.hero-actions {
+    width: min(100%, 470px);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.group-search { flex: 1; }
+
+.refresh-btn {
+    height: 48px;
+    padding: 0 18px;
+    color: #e2e8f0;
+    border-color: rgba(255,255,255,.12);
+    border-radius: 14px;
+    background: rgba(30,41,59,.8);
+}
+
+.refresh-btn:hover:not(:disabled) {
+    color: #fff !important;
+    border-color: #4f7cff !important;
+    background: rgba(79,124,255,.14) !important;
+}
+
+.dashboard-layout .glass-card .ant-card-body {
+    height: clamp(340px, 46vh, 500px);
+}
+
+.dashboard-layout .create-card .ant-card-body {
+    height: auto;
+}
+
+.dashboard-layout .people-card .ant-card-body {
+    height: auto;
+    min-height: 170px;
+    max-height: 500px;
+}
+
+.stat-card {
+    transition: transform .2s ease, border-color .2s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(79,124,255,.45);
+}
+
+@media (max-width: 640px) {
+    .hero-actions {
+        width: 100%;
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .refresh-btn { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .glass-card,
+    .hero-section { animation: none; }
+
+    .glass-card,
+    .group-item,
+    .person-card,
+    .stat-card { transition: none; }
+}

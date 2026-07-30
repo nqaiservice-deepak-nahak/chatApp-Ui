@@ -1,5 +1,6 @@
 import {
   ArrowLeftOutlined,
+  DeleteOutlined,
   SendOutlined,
   UserOutlined,
 } from "@ant-design/icons";
@@ -11,20 +12,23 @@ import {
   Button,
   Input,
   Layout,
+  Popconfirm,
   Spin,
   Typography,
 } from "antd";
 
-import { useEffect, useRef, useState } from "react";
+import { UIEvent, useEffect, useRef, useState } from "react";
 
 import { useNavigate, useParams } from "react-router-dom";
 
 import {
   appendMessage,
+  clearChatHistory,
   fetchChatHistoryThunk,
 } from "../../../redux/features/messages/messages.slice";
 
 import {
+  deleteGroupThunk,
   fetchGroupDetailsThunk,
 } from "../../../redux/features/groups/groups.slice";
 
@@ -53,10 +57,16 @@ export default function ChatScreen() {
   const {
     chatHistory,
     historyLoading,
+    olderHistoryLoading,
+    chatHasMore,
+    chatNextOffset,
+    error,
   } = useAppSelector((state) => state.messages);
 
   const {
     groupDetails,
+    deleteLoading,
+    error: groupError,
   } = useAppSelector((state) => state.groups);
 
   const [draft, setDraft] = useState("");
@@ -65,6 +75,12 @@ export default function ChatScreen() {
 
   const messagesEndRef =
     useRef<HTMLDivElement | null>(null);
+
+  const contentRef =
+    useRef<HTMLElement | null>(null);
+
+  const loadingOlderRef =
+    useRef(false);
 
   const {
     isConnected,
@@ -92,19 +108,81 @@ export default function ChatScreen() {
 
     dispatch(fetchGroupDetailsThunk(groupId));
 
-    dispatch(fetchChatHistoryThunk(groupId));
+    dispatch(fetchChatHistoryThunk({ groupId }));
+
+    return () => {
+
+      dispatch(clearChatHistory());
+
+    };
 
   }, [dispatch, groupId]);
 
   useEffect(() => {
 
-    messagesEndRef.current?.scrollIntoView({
+    if (!loadingOlderRef.current) {
 
-      behavior: "smooth",
+      messagesEndRef.current?.scrollIntoView({
 
-    });
+        behavior: "smooth",
+
+      });
+
+    }
 
   }, [chatHistory]);
+
+  const handleHistoryScroll = async (event: UIEvent<HTMLElement>) => {
+
+    const container = event.currentTarget;
+
+    if (
+      container.scrollTop > 40 ||
+      !groupId ||
+      !chatHasMore ||
+      chatNextOffset === null ||
+      olderHistoryLoading ||
+      loadingOlderRef.current
+    ) {
+      return;
+    }
+
+    loadingOlderRef.current = true;
+
+    const previousScrollHeight =
+      container.scrollHeight;
+
+    try {
+
+      await dispatch(fetchChatHistoryThunk({
+        groupId,
+        offset: chatNextOffset,
+      })).unwrap();
+
+      requestAnimationFrame(() => {
+
+        const currentContainer =
+          contentRef.current;
+
+        if (currentContainer) {
+
+          currentContainer.scrollTop =
+            currentContainer.scrollHeight -
+            previousScrollHeight;
+
+        }
+
+        loadingOlderRef.current = false;
+
+      });
+
+    } catch {
+
+      loadingOlderRef.current = false;
+
+    }
+
+  };
 
   const handleSend = () => {
 
@@ -115,6 +193,24 @@ export default function ChatScreen() {
     sendMessage(text);
 
     setDraft("");
+
+  };
+
+  const handleDeleteGroup = async () => {
+
+    if (!groupId) return;
+
+    try {
+
+      await dispatch(deleteGroupThunk(groupId)).unwrap();
+
+      navigate("/dashboard");
+
+    } catch {
+
+      // The rejected thunk stores the API error in the groups state.
+
+    }
 
   };
 
@@ -186,13 +282,37 @@ export default function ChatScreen() {
 
         </div>
 
+        {groupDetails && String(groupDetails.createdBy) === user?.id && (
+
+          <Popconfirm
+            title="Delete this group?"
+            description="All group messages and memberships will be permanently deleted."
+            okText="Delete"
+            cancelText="Cancel"
+            okButtonProps={{ danger: true, loading: deleteLoading }}
+            onConfirm={handleDeleteGroup}
+          >
+
+            <Button
+              danger
+              type="primary"
+              icon={<DeleteOutlined />}
+              loading={deleteLoading}
+            >
+              Delete group
+            </Button>
+
+          </Popconfirm>
+
+        )}
+
       </Header>
 
-      {socketError && (
+      {(socketError || error || groupError) && (
 
         <Alert
           type="error"
-          message={socketError}
+          message={socketError || error || groupError}
           showIcon
           closable
           className="chat-alert"
@@ -203,7 +323,21 @@ export default function ChatScreen() {
 
       )}
 
-      <Content className="chat-content">
+      <Content
+        ref={contentRef}
+        className="chat-content"
+        onScroll={handleHistoryScroll}
+      >
+        {olderHistoryLoading && (
+
+          <div className="history-page-loader">
+
+            <Spin size="small" />
+
+          </div>
+
+        )}
+
         {historyLoading ? (
 
           <div className="chat-loader">

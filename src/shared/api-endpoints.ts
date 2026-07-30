@@ -17,11 +17,12 @@ export const API_ENDPOINTS = {
   AVAILABLE_GROUPS: '/groups/available',
   GROUP_DETAILS: (groupId: string) => `/groups/${groupId}`,
   JOIN_GROUP: (groupId: string) => `/groups/${groupId}/join`,
+  DELETE_GROUP: (groupId: string) => `/groups/${groupId}`,
   //#endregion GROUPS
 
   //#region MESSAGES
-  CHAT_HISTORY: (groupId: string) => `/groups/${groupId}/messages`,
-  PRIVATE_CHAT_HISTORY: (userId: string) => `/messages/private/${userId}`,
+  CHAT_HISTORY: '/history',
+  PRIVATE_CHAT_HISTORY: '/messages/private-history',
   SEND_PRIVATE_MESSAGE: (userId: string) => `/messages/private/${userId}`
   //#endregion MESSAGES
 };

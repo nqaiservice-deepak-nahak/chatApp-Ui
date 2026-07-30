@@ -11,6 +11,7 @@ interface GroupsState {
   createLoading: boolean;
   detailsLoading: boolean;
   joinLoading: boolean;
+  deleteLoading: boolean;
   error: string | null;
 }
 
@@ -22,6 +23,7 @@ const initialState: GroupsState = {
   createLoading: false,
   detailsLoading: false,
   joinLoading: false,
+  deleteLoading: false,
   error: null
 };
 
@@ -71,6 +73,15 @@ export const joinGroupThunk = createAsyncThunk('groups/join', async (groupId: st
     return groupId;
   } catch (error: any) {
     return rejectWithValue(error?.response?.data?.message || 'Failed to join group.');
+  }
+});
+
+export const deleteGroupThunk = createAsyncThunk('groups/delete', async (groupId: string, { rejectWithValue }) => {
+  try {
+    await API.delete(API_ENDPOINTS.DELETE_GROUP(groupId));
+    return groupId;
+  } catch (error: any) {
+    return rejectWithValue(error?.response?.data?.message || 'Failed to delete group.');
   }
 });
 //#endregion Thunks
@@ -138,6 +149,22 @@ const groupsSlice = createSlice({
       })
       .addCase(joinGroupThunk.rejected, (state, action: PayloadAction<any>) => {
         state.joinLoading = false;
+        state.error = action.payload;
+      })
+      .addCase(deleteGroupThunk.pending, (state) => {
+        state.deleteLoading = true;
+        state.error = null;
+      })
+      .addCase(deleteGroupThunk.fulfilled, (state, action) => {
+        state.deleteLoading = false;
+        state.myGroups = state.myGroups.filter((group) => group._id !== action.payload);
+        state.availableGroups = state.availableGroups.filter((group) => group._id !== action.payload);
+        if (state.groupDetails?._id === action.payload) {
+          state.groupDetails = null;
+        }
+      })
+      .addCase(deleteGroupThunk.rejected, (state, action: PayloadAction<any>) => {
+        state.deleteLoading = false;
         state.error = action.payload;
       });
   }

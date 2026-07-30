@@ -19,6 +19,7 @@ import {
   UserOutlined,
   ArrowRightOutlined,
   SearchOutlined,
+  ReloadOutlined,
 } from "@ant-design/icons";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -53,8 +54,27 @@ export default function Dashboard() {
   } = useAppSelector((state) => state.groups);
 
   const [form] = Form.useForm();
+  const [groupSearch, setGroupSearch] = useState("");
   const [peopleSearch, setPeopleSearch] = useState("");
   const { user, availableUsers, usersLoading } = useAppSelector((state) => state.auth);
+  const filteredMyGroups = useMemo(() => {
+    const query = groupSearch.trim().toLowerCase();
+    if (!query) return myGroups;
+    return myGroups.filter(
+      (group) =>
+        group.name.toLowerCase().includes(query) ||
+        group.description?.toLowerCase().includes(query)
+    );
+  }, [myGroups, groupSearch]);
+  const filteredAvailableGroups = useMemo(() => {
+    const query = groupSearch.trim().toLowerCase();
+    if (!query) return availableGroups;
+    return availableGroups.filter(
+      (group) =>
+        group.name.toLowerCase().includes(query) ||
+        group.description?.toLowerCase().includes(query)
+    );
+  }, [availableGroups, groupSearch]);
   const filteredUsers = useMemo(() => {
     const query = peopleSearch.trim().toLowerCase();
     if (!query) return availableUsers;
@@ -68,6 +88,12 @@ export default function Dashboard() {
     dispatch(fetchAvailableGroupsThunk());
     dispatch(fetchAvailableUsersThunk());
   }, [dispatch]);
+
+  const refreshDashboard = () => {
+    dispatch(fetchMyGroupsThunk());
+    dispatch(fetchAvailableGroupsThunk());
+    dispatch(fetchAvailableUsersThunk());
+  };
 
   const handleCreateGroup = async (values: {
     name: string;
@@ -103,6 +129,25 @@ export default function Dashboard() {
 
           </div>
 
+          <div className="hero-actions">
+            <Input
+              allowClear
+              value={groupSearch}
+              onChange={(event) => setGroupSearch(event.target.value)}
+              prefix={<SearchOutlined />}
+              placeholder="Search conversations"
+              aria-label="Search groups"
+              className="group-search"
+            />
+            <Button
+              icon={<ReloadOutlined spin={listLoading || usersLoading} />}
+              onClick={refreshDashboard}
+              disabled={listLoading || usersLoading}
+              className="refresh-btn"
+            >
+              Refresh
+            </Button>
+          </div>
         </div>
 
         {error && (
@@ -148,11 +193,11 @@ export default function Dashboard() {
                 <div className="loader-box">
                   <Spin size="large" />
                 </div>
-              ) : myGroups.length === 0 ? (
-                <Empty description="No joined groups yet." />
+              ) : filteredMyGroups.length === 0 ? (
+                <Empty description={groupSearch ? "No joined groups match your search." : "No joined groups yet."} />
               ) : (
                 <List
-                  dataSource={myGroups}
+                  dataSource={filteredMyGroups}
                   renderItem={(group) => (
                     <List.Item
                       className="group-item"
@@ -202,11 +247,11 @@ export default function Dashboard() {
                 <div className="loader-box">
                   <Spin size="large" />
                 </div>
-              ) : availableGroups.length === 0 ? (
-                <Empty description="No available groups." />
+              ) : filteredAvailableGroups.length === 0 ? (
+                <Empty description={groupSearch ? "No available groups match your search." : "No available groups."} />
               ) : (
                 <List
-                  dataSource={availableGroups}
+                  dataSource={filteredAvailableGroups}
                   renderItem={(group) => (
                     <List.Item
                       className="group-item"
