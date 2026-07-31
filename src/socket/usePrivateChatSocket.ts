@@ -10,6 +10,7 @@ export const usePrivateChatSocket = (
   onError: (message: string) => void
 ) => {
   const [isConnected, setIsConnected] = useState(false);
+  const [isOtherUserOnline, setIsOtherUserOnline] = useState(false);
   const socketRef = useRef(getSocket());
   const onMessageRef = useRef(onMessage);
   const onErrorRef = useRef(onError);
@@ -34,8 +35,17 @@ export const usePrivateChatSocket = (
     const joinConversation = () => {
       setIsConnected(true);
       socket.emit('joinPrivateChat', { userId: otherUserId });
+      socket.emit('checkUserPresence', { userId: otherUserId });
     };
-    const handleDisconnect = () => setIsConnected(false);
+    const handleDisconnect = () => {
+      setIsConnected(false);
+      setIsOtherUserOnline(false);
+    };
+    const handlePresence = (payload: { userId?: string; isOnline?: boolean }) => {
+      if (payload?.userId === otherUserId) {
+        setIsOtherUserOnline(Boolean(payload.isOnline));
+      }
+    };
     const handleMessage = (message: EncryptedChatMessage) => {
       const belongsToConversation = message.chatId
         ? !expectedChatId || message.chatId === expectedChatId
@@ -44,7 +54,12 @@ export const usePrivateChatSocket = (
 
       messageQueue = messageQueue.then(async () => {
         const normalized = await normalizeChatMessage(message);
-        if (isActive) onMessageRef.current(normalized);
+        if (isActive) {
+          onMessageRef.current(normalized);
+          if (normalized.senderId === otherUserId) {
+            socket.emit('markPrivateChatRead', { userId: otherUserId });
+          }
+        }
       });
     };
     const handleError = (payload: { message?: string }) => {
@@ -54,6 +69,8 @@ export const usePrivateChatSocket = (
     socket.on('connect', joinConversation);
     socket.on('disconnect', handleDisconnect);
     socket.on('newPrivateMessage', handleMessage);
+    socket.on('userPresence', handlePresence);
+    socket.on('presenceChanged', handlePresence);
     socket.on('error', handleError);
 
     if (socket.connected) joinConversation();
@@ -64,6 +81,8 @@ export const usePrivateChatSocket = (
       socket.off('connect', joinConversation);
       socket.off('disconnect', handleDisconnect);
       socket.off('newPrivateMessage', handleMessage);
+      socket.off('userPresence', handlePresence);
+      socket.off('presenceChanged', handlePresence);
       socket.off('error', handleError);
       socket.disconnect();
       setIsConnected(false);
@@ -82,5 +101,5 @@ export const usePrivateChatSocket = (
     [otherUserId]
   );
 
-  return { isConnected, sendPrivateMessage };
+  return { isConnected, isOtherUserOnline, sendPrivateMessage };
 };

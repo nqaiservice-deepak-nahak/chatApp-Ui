@@ -90,8 +90,33 @@ export interface ChatListItem {
   directDetails?: DirectConversationDetails;
 }
 
+export interface GroupPresenceMember {
+  userId: string;
+  userName: string;
+  isOnline: boolean;
+}
+
+export interface GroupPresence {
+  groupId: string;
+  activeCount: number;
+  members: GroupPresenceMember[];
+}
+
 export interface AppApiResponse<T = any> {
   code: number;
   message: string | string[];
   data?: T;
+}
+
+export interface PaginatedSearchRequest {
+  offset?: number;
+  limit?: number;
+  searchData?: string;
+}
+
+export interface PaginatedResponse<T> {
+  totalCount: number;
+  offset: number;
+  limit: number;
+  items: T[];
 }

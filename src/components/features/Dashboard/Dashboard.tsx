@@ -38,7 +38,6 @@ import {
   createGroupThunk,
   fetchAvailableGroupsThunk,
   fetchMyGroupsThunk,
-  searchPublicGroupsThunk,
 } from "../../../redux/features/groups/groups.slice";
 import {
   clearMessagesError,
@@ -96,10 +95,9 @@ export default function Dashboard() {
 
   const {
     availableGroups,
-    searchResults,
+    availableGroupsTotalCount,
     listLoading,
     availableLoading,
-    searchLoading,
     createLoading,
     error,
     availableError,
@@ -107,30 +105,20 @@ export default function Dashboard() {
   } = useAppSelector((state) => state.groups);
   const {
     chatList,
+    chatTotalCount,
     chatsLoading,
     error: messagesError,
   } = useAppSelector((state) => state.messages);
   const {
     user,
     availableUsers,
+    availableUsersTotalCount,
     usersLoading,
     error: authError,
   } = useAppSelector((state) => state.auth);
 
   const normalizedGroupSearch = groupSearch.trim();
-  const displayedAvailableGroups = normalizedGroupSearch ? searchResults : availableGroups;
-  const discoveryLoading = normalizedGroupSearch ? searchLoading : availableLoading;
-
-  const filteredUsers = useMemo(() => {
-    const query = peopleSearch.trim().toLowerCase();
-    if (!query) return availableUsers;
-
-    return availableUsers.filter(
-      (person) =>
-        person.name.toLowerCase().includes(query) ||
-        person.email.toLowerCase().includes(query),
-    );
-  }, [availableUsers, peopleSearch]);
+  const normalizedPeopleSearch = peopleSearch.trim();
 
   const memberOptions = useMemo(() => {
     const candidates = new Map<string, { value: string; label: string }>();
@@ -171,34 +159,51 @@ export default function Dashboard() {
 
   useEffect(() => {
     refreshChats();
-    dispatch(fetchMyGroupsThunk());
-    dispatch(fetchAvailableUsersThunk());
+    dispatch(fetchMyGroupsThunk({ offset: 0, limit: 100 }));
   }, [dispatch, refreshChats]);
 
 
   useEffect(() => {
-    if (!normalizedGroupSearch) {
-      dispatch(fetchAvailableGroupsThunk());
-      return;
-    }
-
     const timeoutId = window.setTimeout(() => {
-      dispatch(searchPublicGroupsThunk(normalizedGroupSearch));
+      dispatch(
+        fetchAvailableGroupsThunk({
+          offset: 0,
+          limit: 100,
+          searchData: normalizedGroupSearch || undefined,
+        }),
+      );
     }, 350);
 
     return () => window.clearTimeout(timeoutId);
   }, [dispatch, normalizedGroupSearch]);
 
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      dispatch(
+        fetchAvailableUsersThunk({
+          offset: 0,
+          limit: 100,
+          searchData: normalizedPeopleSearch || undefined,
+        }),
+      );
+    }, 350);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [dispatch, normalizedPeopleSearch]);
+
   const refreshDashboard = () => {
     dispatch(fetchChatsThunk());
-    dispatch(fetchMyGroupsThunk());
-    dispatch(fetchAvailableUsersThunk());
-
-    if (normalizedGroupSearch) {
-      dispatch(searchPublicGroupsThunk(normalizedGroupSearch));
-    } else {
-      dispatch(fetchAvailableGroupsThunk());
-    }
+    dispatch(fetchMyGroupsThunk({ offset: 0, limit: 100 }));
+    dispatch(fetchAvailableUsersThunk({
+      offset: 0,
+      limit: 100,
+      searchData: normalizedPeopleSearch || undefined,
+    }));
+    dispatch(fetchAvailableGroupsThunk({
+      offset: 0,
+      limit: 100,
+      searchData: normalizedGroupSearch || undefined,
+    }));
   };
 
   const handleCreateGroup = async (values: CreateGroupValues) => {
@@ -223,13 +228,12 @@ export default function Dashboard() {
 
       form.resetFields();
       dispatch(fetchChatsThunk());
-      dispatch(fetchMyGroupsThunk());
-
-      if (normalizedGroupSearch) {
-        dispatch(searchPublicGroupsThunk(normalizedGroupSearch));
-      } else {
-        dispatch(fetchAvailableGroupsThunk());
-      }
+      dispatch(fetchMyGroupsThunk({ offset: 0, limit: 100 }));
+      dispatch(fetchAvailableGroupsThunk({
+        offset: 0,
+        limit: 100,
+        searchData: normalizedGroupSearch || undefined,
+      }));
     }
   };
 
@@ -237,7 +241,6 @@ export default function Dashboard() {
     chatsLoading ||
     listLoading ||
     availableLoading ||
-    searchLoading ||
     usersLoading;
   const dashboardError = error || searchError || availableError || messagesError || authError;
 
@@ -261,7 +264,7 @@ export default function Dashboard() {
               value={groupSearch}
               onChange={(event) => setGroupSearch(event.target.value)}
               prefix={<SearchOutlined />}
-              suffix={searchLoading ? <Spin size="small" /> : undefined}
+              suffix={availableLoading ? <Spin size="small" /> : undefined}
               placeholder="Search public groups"
               aria-label="Search public groups"
               className="group-search"
@@ -307,7 +310,7 @@ export default function Dashboard() {
           <Col span={24}>
             <div className="dashboard-stats" aria-label="Workspace overview">
               <div className="stat-card">
-                <strong>{chatList.length}</strong>
+                <strong>{chatTotalCount}</strong>
                 <span>Active chats</span>
               </div>
               <div className="stat-card">
@@ -315,11 +318,11 @@ export default function Dashboard() {
                 <span>Unread messages</span>
               </div>
               <div className="stat-card">
-                <strong>{displayedAvailableGroups.length}</strong>
+                <strong>{availableGroupsTotalCount}</strong>
                 <span>{normalizedGroupSearch ? "Search matches" : "Groups to discover"}</span>
               </div>
               <div className="stat-card">
-                <strong>{availableUsers.length}</strong>
+                <strong>{availableUsersTotalCount}</strong>
                 <span>New people</span>
               </div>
             </div>
@@ -429,11 +432,11 @@ export default function Dashboard() {
                 </div>
               }
             >
-              {discoveryLoading ? (
+              {availableLoading ? (
                 <div className="loader-box">
                   <Spin size="large" />
                 </div>
-              ) : displayedAvailableGroups.length === 0 ? (
+              ) : availableGroups.length === 0 ? (
                 <Empty
                   description={
                     normalizedGroupSearch
@@ -443,7 +446,7 @@ export default function Dashboard() {
                 />
               ) : (
                 <List
-                  dataSource={displayedAvailableGroups}
+                  dataSource={availableGroups}
                   renderItem={(group) => (
                     <List.Item
                       className="group-item"
@@ -513,7 +516,7 @@ export default function Dashboard() {
                 <div className="loader-box">
                   <Spin size="large" />
                 </div>
-              ) : filteredUsers.length === 0 ? (
+              ) : availableUsers.length === 0 ? (
                 <Empty
                   description={
                     peopleSearch
@@ -524,7 +527,7 @@ export default function Dashboard() {
               ) : (
                 <List
                   grid={{ gutter: 16, xs: 1, sm: 2, lg: 3 }}
-                  dataSource={filteredUsers}
+                  dataSource={availableUsers}
                   renderItem={(person) => (
                     <List.Item>
                       <button
@@ -623,9 +626,9 @@ export default function Dashboard() {
 
                       <Col xs={24} md={15}>
                         <Form.Item
-                          label="Invite members"
+                          label="Add members"
                           name="memberIds"
-                          tooltip="Optional. You can invite up to 100 people now and add more later."
+                          tooltip="Optional. You can add up to 100 people now and add more later."
                         >
                           <Select
                             mode="multiple"
@@ -637,8 +640,8 @@ export default function Dashboard() {
                             maxTagCount="responsive"
                             placeholder={
                               memberOptions.length
-                                ? "Choose people to invite"
-                                : "No people available to invite"
+                                ? "Choose people to add"
+                                : "No people available to add"
                             }
                             disabled={!memberOptions.length}
                           />
@@ -662,7 +665,7 @@ export default function Dashboard() {
                     <Title level={4}>Bring the right people together</Title>
                     <Text>
                       Public groups can be discovered and joined by anyone. Private groups stay
-                      out of discovery, so invite the people who should have access when you
+                      out of discovery, so add the people who should have access when you
                       create one.
                     </Text>
                     <div className="visibility-hints">
@@ -670,7 +673,7 @@ export default function Dashboard() {
                         <GlobalOutlined /> Public and discoverable
                       </span>
                       <span>
-                        <LockOutlined /> Private and invite-only
+                        <LockOutlined /> Private 
                       </span>
                     </div>
                   </div>
