@@ -6,6 +6,7 @@ import {
   MoreOutlined,
   SendOutlined,
   SwapOutlined,
+  TeamOutlined,
   UserAddOutlined,
   UserOutlined,
 } from "@ant-design/icons";
@@ -119,6 +120,8 @@ export default function ChatScreen() {
 
   const [transferOpen, setTransferOpen] = useState(false);
 
+  const [groupDetailsOpen, setGroupDetailsOpen] = useState(false);
+
   const [newOwnerUserId, setNewOwnerUserId] = useState<string>();
 
   const ownershipCandidates = useMemo(() => {
@@ -152,6 +155,9 @@ export default function ChatScreen() {
 
   const {
     isConnected,
+    activeMembers,
+    groupMembers,
+    refreshGroupPresence,
     sendMessage,
   } = useChatSocket(
 
@@ -280,7 +286,7 @@ export default function ChatScreen() {
 
     dispatch(clearGroupMemberErrors());
 
-    dispatch(fetchAvailableGroupMembersThunk(groupId));
+    dispatch(fetchAvailableGroupMembersThunk({ groupId, offset: 0, limit: 100 }));
 
   };
 
@@ -305,7 +311,7 @@ export default function ChatScreen() {
           `${result.added} added; ${failedCount} could not be added. The available list has been refreshed.`
         );
 
-        dispatch(fetchAvailableGroupMembersThunk(groupId));
+        dispatch(fetchAvailableGroupMembersThunk({ groupId, offset: 0, limit: 100 }));
 
       } else {
 
@@ -316,6 +322,7 @@ export default function ChatScreen() {
       }
 
       dispatch(fetchGroupDetailsThunk(groupId));
+      refreshGroupPresence();
 
     } catch {
 
@@ -414,19 +421,26 @@ export default function ChatScreen() {
           <Avatar
             size={50}
             className="chat-avatar"
-            icon={<UserOutlined />}
+            icon={<TeamOutlined />}
           />
 
           <div className="chat-header-info">
 
             <div className="chat-title-row">
 
-              <Title
-                level={4}
-                className="chat-title"
+              <button
+                type="button"
+                className="group-title-button"
+                onClick={() => setGroupDetailsOpen(true)}
+                aria-label="View group details and members"
               >
-                {groupDetails?.name || "Group Chat"}
-              </Title>
+                <Title
+                  level={4}
+                  className="chat-title"
+                >
+                  {groupDetails?.name || "Group Chat"}
+                </Title>
+              </button>
 
               {groupDetails && (
                 <Tag
@@ -440,22 +454,32 @@ export default function ChatScreen() {
             </div>
 
             <div className="chat-status">
-
-              <Badge
-                status={
-                  isConnected
-                    ? "success"
-                    : "warning"
-                }
-              />
-
-              <Text>
-
-                {isConnected
-                  ? "Connected"
-                  : "Connecting..."}
-
-              </Text>
+              {isConnected ? (
+                <Dropdown
+                  trigger={["click"]}
+                  menu={{
+                    items: activeMembers.map((member) => ({
+                      key: member.userId,
+                      label: member.userId === user?.id ? `${member.userName} (You)` : member.userName,
+                      icon: <UserOutlined />,
+                      disabled: member.userId === user?.id,
+                    })),
+                    onClick: ({ key }) => {
+                      if (key !== user?.id) navigate(`/messages/${key}`);
+                    },
+                  }}
+                >
+                  <Button type="text" className="active-members-trigger">
+                    <Badge status="success" />
+                    <span>{activeMembers.length} Active</span>
+                  </Button>
+                </Dropdown>
+              ) : (
+                <>
+                  <Badge status="warning" />
+                  <Text>Connecting...</Text>
+                </>
+              )}
 
             </div>
 
@@ -584,7 +608,7 @@ export default function ChatScreen() {
             <Avatar
               size={80}
               className="empty-avatar"
-              icon={<UserOutlined />}
+              icon={<TeamOutlined />}
             />
 
             <Title level={4}>
@@ -692,6 +716,57 @@ export default function ChatScreen() {
         </Button>
 
       </Footer>
+
+      <Modal
+        title={
+          <div className="group-details-modal-title">
+            <Avatar className="group-details-avatar" icon={<TeamOutlined />} />
+            <span>{groupDetails?.name || "Group details"}</span>
+          </div>
+        }
+        open={groupDetailsOpen}
+        footer={null}
+        onCancel={() => setGroupDetailsOpen(false)}
+      >
+        <div className="group-details-modal">
+          {groupDetails?.description && (
+            <Text type="secondary">{groupDetails.description}</Text>
+          )}
+
+          <div className="group-details-summary">
+            <span>Created by <strong>{groupDetails?.createdByName || "Unknown"}</strong></span>
+            <Tag color={groupDetails?.type === "private" ? "purple" : "green"}>
+              {groupDetails?.type === "private" ? "Private" : "Public"}
+            </Tag>
+          </div>
+
+          <div className="group-members-heading">
+            <strong>Members</strong>
+            <span>{groupMembers.length || groupDetails?.totalMembers || 0}</span>
+          </div>
+
+          <div className="group-members-list">
+            {groupMembers.length === 0 ? (
+              <Text type="secondary">
+                {isConnected ? "No member details are available." : "Loading members..."}
+              </Text>
+            ) : (
+              groupMembers.map((member) => (
+                <div key={member.userId} className="group-member-row">
+                  <Avatar icon={<UserOutlined />} />
+                  <div className="group-member-copy">
+                    <strong>
+                      {member.userName}{member.userId === user?.id ? " (You)" : ""}
+                    </strong>
+                    <span>{member.isOnline ? "Online" : "Offline"}</span>
+                  </div>
+                  <Badge status={member.isOnline ? "success" : "default"} />
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </Modal>
 
       <Modal
         title="Add members"

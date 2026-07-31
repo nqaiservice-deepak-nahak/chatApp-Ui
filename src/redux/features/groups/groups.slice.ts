@@ -6,6 +6,8 @@ import {
   Group,
   GroupType,
   MemberAddResult,
+  PaginatedResponse,
+  PaginatedSearchRequest,
   User
 } from '../../../@types';
 import API from '../../../config/axios.config';
@@ -21,6 +23,10 @@ export interface CreateGroupRequest {
 export interface GroupMembersRequest {
   groupId: string;
   memberIds: string[];
+}
+
+export interface AvailableGroupMembersRequest extends PaginatedSearchRequest {
+  groupId: string;
 }
 
 export interface TransferGroupOwnershipRequest {
@@ -39,10 +45,13 @@ interface GroupMembersResult extends AddMembersResponse {
 
 export interface GroupsState {
   myGroups: Group[];
+  myGroupsTotalCount: number;
   availableGroups: Group[];
+  availableGroupsTotalCount: number;
   searchResults: Group[];
   groupDetails: Group | null;
   availableMembers: User[];
+  availableMembersTotalCount: number;
   lastMemberAddSummary: MemberAddResult[];
   listLoading: boolean;
   availableLoading: boolean;
@@ -66,10 +75,13 @@ export interface GroupsState {
 
 const initialState: GroupsState = {
   myGroups: [],
+  myGroupsTotalCount: 0,
   availableGroups: [],
+  availableGroupsTotalCount: 0,
   searchResults: [],
   groupDetails: null,
   availableMembers: [],
+  availableMembersTotalCount: 0,
   lastMemberAddSummary: [],
   listLoading: false,
   availableLoading: false,
@@ -98,24 +110,30 @@ const getErrorMessage = (error: any, fallback: string): string => {
 };
 
 //#region Thunks
-export const fetchMyGroupsThunk = createAsyncThunk<Group[], void, { rejectValue: string }>(
+export const fetchMyGroupsThunk = createAsyncThunk<PaginatedResponse<Group>, PaginatedSearchRequest | void, { rejectValue: string }>(
   'groups/fetchMy',
-  async (_: void, { rejectWithValue }) => {
+  async (options, { rejectWithValue }) => {
     try {
-      const res = await API.get<AppApiResponse<Group[]>>(API_ENDPOINTS.MY_GROUPS);
-      return res.data.data || [];
+      const res = await API.post<AppApiResponse<PaginatedResponse<Group>>>(
+        API_ENDPOINTS.MY_GROUPS,
+        options || { offset: 0, limit: 100 }
+      );
+      return res.data.data || { totalCount: 0, offset: 0, limit: 0, items: [] };
     } catch (error: any) {
       return rejectWithValue(getErrorMessage(error, 'Failed to load your groups.'));
     }
   }
 );
 
-export const fetchAvailableGroupsThunk = createAsyncThunk<Group[], void, { rejectValue: string }>(
+export const fetchAvailableGroupsThunk = createAsyncThunk<PaginatedResponse<Group>, PaginatedSearchRequest | void, { rejectValue: string }>(
   'groups/fetchAvailable',
-  async (_: void, { rejectWithValue }) => {
+  async (options, { rejectWithValue }) => {
     try {
-      const res = await API.get<AppApiResponse<Group[]>>(API_ENDPOINTS.AVAILABLE_GROUPS);
-      return res.data.data || [];
+      const res = await API.post<AppApiResponse<PaginatedResponse<Group>>>(
+        API_ENDPOINTS.AVAILABLE_GROUPS,
+        options || { offset: 0, limit: 100 }
+      );
+      return res.data.data || { totalCount: 0, offset: 0, limit: 0, items: [] };
     } catch (error: any) {
       return rejectWithValue(getErrorMessage(error, 'Failed to load available groups.'));
     }
@@ -176,13 +194,19 @@ export const joinGroupThunk = createAsyncThunk<
 });
 
 export const fetchAvailableGroupMembersThunk = createAsyncThunk<
-  { groupId: string; members: User[] },
-  string,
+  { groupId: string; page: PaginatedResponse<User> },
+  AvailableGroupMembersRequest,
   { rejectValue: string }
->('groups/fetchAvailableMembers', async (groupId, { rejectWithValue }) => {
+>('groups/fetchAvailableMembers', async ({ groupId, offset = 0, limit = 100, searchData }, { rejectWithValue }) => {
   try {
-    const res = await API.get<AppApiResponse<User[]>>(API_ENDPOINTS.AVAILABLE_GROUP_MEMBERS(groupId));
-    return { groupId, members: res.data.data || [] };
+    const res = await API.post<AppApiResponse<PaginatedResponse<User>>>(
+      API_ENDPOINTS.AVAILABLE_GROUP_MEMBERS(groupId),
+      { offset, limit, searchData }
+    );
+    return {
+      groupId,
+      page: res.data.data || { totalCount: 0, offset, limit: 0, items: [] }
+    };
   } catch (error: any) {
     return rejectWithValue(getErrorMessage(error, 'Failed to load available group members.'));
   }
@@ -259,6 +283,7 @@ const groupsSlice = createSlice({
     clearGroupDetails: (state) => {
       state.groupDetails = null;
       state.availableMembers = [];
+      state.availableMembersTotalCount = 0;
       state.lastMemberAddSummary = [];
       state.membersError = null;
       state.addMembersError = null;
@@ -279,6 +304,7 @@ const groupsSlice = createSlice({
     },
     resetAvailableMembers: (state) => {
       state.availableMembers = [];
+      state.availableMembersTotalCount = 0;
       state.lastMemberAddSummary = [];
       state.membersError = null;
       state.addMembersError = null;
@@ -292,7 +318,8 @@ const groupsSlice = createSlice({
       })
       .addCase(fetchMyGroupsThunk.fulfilled, (state, action) => {
         state.listLoading = false;
-        state.myGroups = action.payload;
+        state.myGroups = action.payload.items;
+        state.myGroupsTotalCount = action.payload.totalCount;
       })
       .addCase(fetchMyGroupsThunk.rejected, (state, action) => {
         state.listLoading = false;
@@ -304,7 +331,8 @@ const groupsSlice = createSlice({
       })
       .addCase(fetchAvailableGroupsThunk.fulfilled, (state, action) => {
         state.availableLoading = false;
-        state.availableGroups = action.payload;
+        state.availableGroups = action.payload.items;
+        state.availableGroupsTotalCount = action.payload.totalCount;
       })
       .addCase(fetchAvailableGroupsThunk.rejected, (state, action) => {
         state.availableLoading = false;
@@ -403,7 +431,8 @@ const groupsSlice = createSlice({
       })
       .addCase(fetchAvailableGroupMembersThunk.fulfilled, (state, action) => {
         state.membersLoading = false;
-        state.availableMembers = action.payload.members;
+        state.availableMembers = action.payload.page.items;
+        state.availableMembersTotalCount = action.payload.page.totalCount;
       })
       .addCase(fetchAvailableGroupMembersThunk.rejected, (state, action) => {
         state.membersLoading = false;
@@ -421,6 +450,7 @@ const groupsSlice = createSlice({
 
         const addedIds = new Set(action.payload.results.filter((result) => result.ok).map((result) => result.id));
         state.availableMembers = state.availableMembers.filter((member) => !addedIds.has(member.id));
+        state.availableMembersTotalCount = Math.max(0, state.availableMembersTotalCount - action.payload.added);
 
         if (state.groupDetails?._id === action.payload.groupId && typeof state.groupDetails.totalMembers === 'number') {
           state.groupDetails.totalMembers += action.payload.added;
