@@ -1,7 +1,12 @@
 import {
   ArrowLeftOutlined,
   DeleteOutlined,
+  GlobalOutlined,
+  LockOutlined,
+  MoreOutlined,
   SendOutlined,
+  SwapOutlined,
+  UserAddOutlined,
   UserOutlined,
 } from "@ant-design/icons";
 
@@ -10,27 +15,44 @@ import {
   Avatar,
   Badge,
   Button,
+  Dropdown,
   Input,
   Layout,
-  Popconfirm,
+  Modal,
+  Select,
   Spin,
+  Tag,
   Typography,
 } from "antd";
 
-import { UIEvent, useEffect, useRef, useState } from "react";
+import { UIEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { useNavigate, useParams } from "react-router-dom";
 
 import {
   appendMessage,
   clearChatHistory,
+  clearMessagesError,
+  fetchChatsThunk,
   fetchChatHistoryThunk,
 } from "../../../redux/features/messages/messages.slice";
 
 import {
+  addGroupMembersThunk,
+  clearGroupDetails,
+  clearGroupMemberErrors,
+  clearGroupsError,
+  clearTransferOwnershipError,
   deleteGroupThunk,
+  fetchAvailableGroupMembersThunk,
   fetchGroupDetailsThunk,
+  transferGroupOwnershipThunk,
 } from "../../../redux/features/groups/groups.slice";
+
+import {
+  clearAuthError,
+  fetchAvailableUsersThunk,
+} from "../../../redux/features/auth/auth.slice";
 
 import {
   useAppDispatch,
@@ -38,6 +60,8 @@ import {
 } from "../../../redux/hooks";
 
 import { useChatSocket } from "../../../socket/useChatSocket";
+
+import { parseApiDate } from "../../../shared/shared-functions";
 
 import "./chatScreen.css";
 
@@ -52,7 +76,12 @@ export default function ChatScreen() {
 
   const navigate = useNavigate();
 
-  const user = useAppSelector((state) => state.auth.user);
+  const {
+    user,
+    availableUsers,
+    usersLoading,
+    error: authError,
+  } = useAppSelector((state) => state.auth);
 
   const {
     chatHistory,
@@ -60,11 +89,20 @@ export default function ChatScreen() {
     olderHistoryLoading,
     chatHasMore,
     chatNextOffset,
+    chatList,
+    chatsLoading,
     error,
   } = useAppSelector((state) => state.messages);
 
   const {
     groupDetails,
+    availableMembers,
+    membersLoading,
+    addMembersLoading,
+    transferLoading,
+    membersError,
+    addMembersError,
+    transferError,
     deleteLoading,
     error: groupError,
   } = useAppSelector((state) => state.groups);
@@ -72,6 +110,36 @@ export default function ChatScreen() {
   const [draft, setDraft] = useState("");
 
   const [socketError, setSocketError] = useState("");
+
+  const [addMembersOpen, setAddMembersOpen] = useState(false);
+
+  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
+
+  const [memberFeedback, setMemberFeedback] = useState("");
+
+  const [transferOpen, setTransferOpen] = useState(false);
+
+  const [newOwnerUserId, setNewOwnerUserId] = useState<string>();
+
+  const ownershipCandidates = useMemo(() => {
+    const candidates = new Map<string, { id: string; name: string; email: string }>();
+
+    availableUsers.forEach((candidate) => {
+      if (candidate.id !== user?.id) candidates.set(candidate.id, candidate);
+    });
+
+    chatList.forEach((chat) => {
+      if (chat.chatType !== "private" || !chat.directDetails) return;
+      const candidate = {
+        id: chat.directDetails.otherUserId,
+        name: chat.directDetails.otherUserName,
+        email: chat.directDetails.otherUserEmail,
+      };
+      if (candidate.id !== user?.id) candidates.set(candidate.id, candidate);
+    });
+
+    return Array.from(candidates.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [availableUsers, chatList, user?.id]);
 
   const messagesEndRef =
     useRef<HTMLDivElement | null>(null);
@@ -106,6 +174,8 @@ export default function ChatScreen() {
 
     if (!groupId) return;
 
+    dispatch(clearGroupDetails());
+
     dispatch(fetchGroupDetailsThunk(groupId));
 
     dispatch(fetchChatHistoryThunk({ groupId }));
@@ -113,6 +183,8 @@ export default function ChatScreen() {
     return () => {
 
       dispatch(clearChatHistory());
+
+      dispatch(clearGroupDetails());
 
     };
 
@@ -196,6 +268,100 @@ export default function ChatScreen() {
 
   };
 
+  const openAddMembers = () => {
+
+    if (!groupId) return;
+
+    setSelectedMemberIds([]);
+
+    setMemberFeedback("");
+
+    setAddMembersOpen(true);
+
+    dispatch(clearGroupMemberErrors());
+
+    dispatch(fetchAvailableGroupMembersThunk(groupId));
+
+  };
+
+  const handleAddMembers = async () => {
+
+    if (!groupId || selectedMemberIds.length === 0) return;
+
+    try {
+
+      const result = await dispatch(addGroupMembersThunk({
+        groupId,
+        memberIds: selectedMemberIds,
+      })).unwrap();
+
+      setSelectedMemberIds([]);
+
+      const failedCount = result.results.filter((item) => !item.ok).length;
+
+      if (failedCount > 0) {
+
+        setMemberFeedback(
+          `${result.added} added; ${failedCount} could not be added. The available list has been refreshed.`
+        );
+
+        dispatch(fetchAvailableGroupMembersThunk(groupId));
+
+      } else {
+
+        setAddMembersOpen(false);
+
+        setMemberFeedback("");
+
+      }
+
+      dispatch(fetchGroupDetailsThunk(groupId));
+
+    } catch {
+
+      // The rejected thunk exposes the API message through the groups state.
+
+    }
+
+  };
+
+  const openTransferOwnership = () => {
+
+    setNewOwnerUserId(undefined);
+
+    setTransferOpen(true);
+
+    dispatch(clearTransferOwnershipError());
+
+    if (availableUsers.length === 0) dispatch(fetchAvailableUsersThunk());
+
+    if (chatList.length === 0) dispatch(fetchChatsThunk());
+
+  };
+
+  const handleTransferOwnership = async () => {
+
+    if (!groupId || !newOwnerUserId) return;
+
+    try {
+
+      await dispatch(transferGroupOwnershipThunk({
+        groupId,
+        newOwnerUserId,
+      })).unwrap();
+
+      setTransferOpen(false);
+
+      setNewOwnerUserId(undefined);
+
+    } catch {
+
+      // The backend verifies that the selected user is already a member.
+
+    }
+
+  };
+
   const handleDeleteGroup = async () => {
 
     if (!groupId) return;
@@ -206,9 +372,11 @@ export default function ChatScreen() {
 
       navigate("/dashboard");
 
-    } catch {
+    } catch (deleteError) {
 
       // The rejected thunk stores the API error in the groups state.
+
+      throw deleteError;
 
     }
 
@@ -216,7 +384,7 @@ export default function ChatScreen() {
 
   const formatTime = (date: string) => {
 
-    return new Date(date).toLocaleTimeString([], {
+    return parseApiDate(date).toLocaleTimeString([], {
 
       hour: "2-digit",
 
@@ -251,12 +419,25 @@ export default function ChatScreen() {
 
           <div className="chat-header-info">
 
-            <Title
-              level={4}
-              className="chat-title"
-            >
-              {groupDetails?.name || "Group Chat"}
-            </Title>
+            <div className="chat-title-row">
+
+              <Title
+                level={4}
+                className="chat-title"
+              >
+                {groupDetails?.name || "Group Chat"}
+              </Title>
+
+              {groupDetails && (
+                <Tag
+                  color={groupDetails.type === "private" ? "purple" : "green"}
+                  icon={groupDetails.type === "private" ? <LockOutlined /> : <GlobalOutlined />}
+                >
+                  {groupDetails.type === "private" ? "Private" : "Public"}
+                </Tag>
+              )}
+
+            </div>
 
             <div className="chat-status">
 
@@ -284,41 +465,91 @@ export default function ChatScreen() {
 
         {groupDetails && String(groupDetails.createdBy) === user?.id && (
 
-          <Popconfirm
-            title="Delete this group?"
-            description="All group messages and memberships will be permanently deleted."
-            okText="Delete"
-            cancelText="Cancel"
-            okButtonProps={{ danger: true, loading: deleteLoading }}
-            onConfirm={handleDeleteGroup}
+          <Dropdown
+            trigger={["click"]}
+            placement="bottomRight"
+            menu={{
+              items: [
+                {
+                  key: "add-members",
+                  icon: <UserAddOutlined />,
+                  label: "Add members",
+                },
+                {
+                  key: "transfer",
+                  icon: <SwapOutlined />,
+                  label: "Transfer ownership",
+                },
+                {
+                  type: "divider",
+                },
+                {
+                  key: "delete",
+                  danger: true,
+                  icon: <DeleteOutlined />,
+                  label: "Delete group",
+                },
+              ],
+              onClick: ({ key }) => {
+
+                if (key === "add-members") {
+
+                  openAddMembers();
+
+                  return;
+
+                }
+
+                if (key === "transfer") {
+
+                  openTransferOwnership();
+
+                  return;
+
+                }
+
+                if (key !== "delete") return;
+
+                Modal.confirm({
+                  title: "Delete this group?",
+                  content: "All group messages and memberships will be permanently deleted.",
+                  okText: "Delete",
+                  cancelText: "Cancel",
+                  okButtonProps: { danger: true },
+                  onOk: handleDeleteGroup,
+                });
+
+              },
+            }}
           >
 
             <Button
-              danger
-              type="primary"
-              icon={<DeleteOutlined />}
-              loading={deleteLoading}
-            >
-              Delete group
-            </Button>
+              type="text"
+              aria-label="Group options"
+              icon={<MoreOutlined />}
+              loading={deleteLoading || addMembersLoading || transferLoading}
+            />
 
-          </Popconfirm>
+          </Dropdown>
 
         )}
 
       </Header>
 
-      {(socketError || error || groupError) && (
+      {(socketError || error || authError || groupError || membersError || addMembersError || transferError) && (
 
         <Alert
           type="error"
-          message={socketError || error || groupError}
+          message={socketError || error || authError || groupError || membersError || addMembersError || transferError}
           showIcon
           closable
           className="chat-alert"
-          onClose={() =>
-            setSocketError("")
-          }
+          onClose={() => {
+            setSocketError("");
+            dispatch(clearGroupsError());
+            dispatch(clearMessagesError());
+            dispatch(clearAuthError());
+          }}
         />
 
       )}
@@ -436,6 +667,8 @@ export default function ChatScreen() {
 
         <Input
           value={draft}
+          maxLength={4000}
+          showCount
           onChange={(e) =>
             setDraft(e.target.value)
           }
@@ -459,6 +692,87 @@ export default function ChatScreen() {
         </Button>
 
       </Footer>
+
+      <Modal
+        title="Add members"
+        open={addMembersOpen}
+        okText="Add selected"
+        cancelText="Cancel"
+        confirmLoading={addMembersLoading}
+        okButtonProps={{ disabled: selectedMemberIds.length === 0 }}
+        onOk={handleAddMembers}
+        onCancel={() => {
+          if (addMembersLoading) return;
+          setAddMembersOpen(false);
+          setSelectedMemberIds([]);
+          setMemberFeedback("");
+        }}
+      >
+        <div className="group-action-modal">
+          {(membersError || addMembersError) && (
+            <Alert type="error" message={membersError || addMembersError} showIcon />
+          )}
+          {memberFeedback && <Alert type="warning" message={memberFeedback} showIcon />}
+          <Text type="secondary">
+            Choose people who are not already members of this group.
+          </Text>
+          <Select
+            mode="multiple"
+            allowClear
+            showSearch
+            value={selectedMemberIds}
+            loading={membersLoading}
+            placeholder={membersLoading ? "Loading people..." : "Select people to add"}
+            optionFilterProp="label"
+            options={availableMembers.map((member) => ({
+              value: member.id,
+              label: `${member.name || member.email || "Unnamed user"}${member.email ? ` (${member.email})` : ""}`,
+            }))}
+            onChange={setSelectedMemberIds}
+            notFoundContent={membersLoading ? <Spin size="small" /> : "No people are available to add."}
+          />
+        </div>
+      </Modal>
+
+      <Modal
+        title="Transfer group ownership"
+        open={transferOpen}
+        okText="Transfer ownership"
+        cancelText="Cancel"
+        confirmLoading={transferLoading}
+        okButtonProps={{ danger: true, disabled: !newOwnerUserId }}
+        onOk={handleTransferOwnership}
+        onCancel={() => {
+          if (transferLoading) return;
+          setTransferOpen(false);
+          setNewOwnerUserId(undefined);
+        }}
+      >
+        <div className="group-action-modal">
+          {transferError && <Alert type="error" message={transferError} showIcon />}
+          <Text type="secondary">
+            Select an existing group member. After transfer, only the new owner can add members,
+            transfer ownership, or delete this group.
+          </Text>
+          <Select
+            allowClear
+            showSearch
+            value={newOwnerUserId}
+            loading={usersLoading || chatsLoading}
+            placeholder="Select the new owner"
+            optionFilterProp="label"
+            options={ownershipCandidates.map((candidate) => ({
+              value: candidate.id,
+              label: `${candidate.name} (${candidate.email})`,
+            }))}
+            onChange={setNewOwnerUserId}
+            notFoundContent={usersLoading || chatsLoading ? <Spin size="small" /> : "No users found."}
+          />
+          <Text type="secondary" className="group-action-hint">
+            The API will confirm that the selected person is already a member.
+          </Text>
+        </div>
+      </Modal>
 
     </Layout>
 

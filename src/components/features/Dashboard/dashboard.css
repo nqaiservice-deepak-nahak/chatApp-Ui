@@ -785,7 +785,7 @@ body {
 
 .dashboard-stats {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 16px;
 }
 
@@ -849,6 +849,166 @@ body {
     background: linear-gradient(135deg, #06b6d4, #2563eb);
 }
 
+.chat-list-item .ant-list-item-meta {
+    min-width: 0;
+}
+
+.chat-title-row {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+
+.chat-title-row > span:first-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.type-tag {
+    flex: none;
+    margin-inline-end: 0;
+    padding: 1px 9px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .06em;
+    line-height: 20px;
+    text-transform: uppercase;
+}
+
+.type-public {
+    color: #86efac !important;
+    background: rgba(34,197,94,.14) !important;
+}
+
+.type-private {
+    color: #c4b5fd !important;
+    background: rgba(139,92,246,.17) !important;
+}
+
+.type-direct {
+    color: #67e8f9 !important;
+    background: rgba(6,182,212,.14) !important;
+}
+
+.chat-description {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+.chat-description > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.chat-description .empty-preview {
+    color: #64748b;
+    font-style: italic;
+}
+
+.chat-description time {
+    flex: none;
+    color: #64748b;
+    font-size: 11px;
+}
+
+.available-group-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.available-group-copy small {
+    color: #64748b;
+    font-size: 11px;
+}
+
+.dashboard-layout .ant-badge-count {
+    color: #fff;
+    font-weight: 800;
+    background: #ef4444;
+    box-shadow: 0 0 0 2px #1e293b;
+}
+
+.dashboard-select {
+    width: 100%;
+}
+
+.dashboard-layout .dashboard-select .ant-select-selector {
+    min-height: 48px;
+    padding: 7px 13px !important;
+    color: #f8fafc !important;
+    border: 1px solid #334155 !important;
+    border-radius: 14px !important;
+    background: rgba(15,23,42,.95) !important;
+    box-shadow: none !important;
+}
+
+.dashboard-layout .dashboard-select:hover .ant-select-selector,
+.dashboard-layout .dashboard-select.ant-select-focused .ant-select-selector {
+    border-color: #4f7cff !important;
+}
+
+.dashboard-layout .dashboard-select.ant-select-focused .ant-select-selector {
+    box-shadow: 0 0 0 4px rgba(79,124,255,.18) !important;
+}
+
+.dashboard-layout .dashboard-select .ant-select-selection-item,
+.dashboard-layout .dashboard-select .ant-select-selection-placeholder,
+.dashboard-layout .dashboard-select .ant-select-arrow,
+.dashboard-layout .dashboard-select .ant-select-clear {
+    color: #cbd5e1;
+}
+
+.dashboard-layout .member-select .ant-select-selection-overflow {
+    gap: 4px;
+}
+
+.dashboard-layout .member-select .ant-select-selection-item {
+    border-color: rgba(79,124,255,.28);
+    border-radius: 8px;
+    background: rgba(79,124,255,.16);
+}
+
+.select-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.visibility-hints {
+    display: grid;
+    gap: 10px;
+    margin-top: 24px;
+    text-align: left;
+}
+
+.visibility-hints span {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 13px;
+    color: #cbd5e1;
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 12px;
+    background: rgba(15,23,42,.36);
+    font-size: 13px;
+}
+
+.dashboard-layout .ant-input-data-count {
+    color: #64748b;
+}
+
+@media (max-width: 992px) {
+    .dashboard-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 @media (max-width: 640px) {
     .dashboard-stats { grid-template-columns: 1fr; }
     .people-card .ant-card-head-wrapper {
@@ -858,6 +1018,12 @@ body {
     }
     .people-card .ant-card-extra,
     .people-search { width: 100%; }
+
+    .chat-description {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 4px;
+    }
 }
 
 /* Dynamic dashboard controls and fluid panels */

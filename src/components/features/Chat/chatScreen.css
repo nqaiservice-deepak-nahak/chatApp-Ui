@@ -57,6 +57,16 @@
   justify-content: center;
 }
 
+.chat-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.chat-title-row .ant-tag {
+  margin-inline-end: 0;
+}
+
 .chat-title {
   color: #fff !important;
   margin: 0 !important;
@@ -331,6 +341,21 @@
   background: rgba(255, 255, 255, 0.28);
 }
 
+.group-action-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 8px;
+}
+
+.group-action-modal .ant-select {
+  width: 100%;
+}
+
+.group-action-hint {
+  font-size: 12px;
+}
+
 .history-page-loader {
   display: flex;
   justify-content: center;
@@ -450,6 +475,10 @@
 
   .chat-title {
     font-size: 15px !important;
+  }
+
+  .chat-title-row .ant-tag {
+    display: none;
   }
 
   .chat-status {

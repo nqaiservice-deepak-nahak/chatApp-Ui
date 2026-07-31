@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChatMessage } from '../@types';
+import { ChatMessage, EncryptedChatMessage } from '../@types';
+import { normalizeChatMessage } from '../shared/message-crypto';
+import { getStoredUser } from '../shared/shared-functions';
 import { getSocket } from './socket';
 
 export const usePrivateChatSocket = (
@@ -22,16 +24,28 @@ export const usePrivateChatSocket = (
 
     const socket = getSocket();
     socketRef.current = socket;
+    const currentUserId = getStoredUser()?.id;
+    const expectedChatId = currentUserId
+      ? `direct:${[currentUserId, otherUserId].sort().join(':')}`
+      : null;
+    let messageQueue = Promise.resolve();
+    let isActive = true;
 
     const joinConversation = () => {
       setIsConnected(true);
       socket.emit('joinPrivateChat', { userId: otherUserId });
     };
     const handleDisconnect = () => setIsConnected(false);
-    const handleMessage = (message: ChatMessage) => {
-      const belongsToConversation =
-        message.senderId === otherUserId || message.receiverId === otherUserId;
-      if (belongsToConversation) onMessageRef.current(message);
+    const handleMessage = (message: EncryptedChatMessage) => {
+      const belongsToConversation = message.chatId
+        ? !expectedChatId || message.chatId === expectedChatId
+        : message.senderId === otherUserId || message.receiverId === otherUserId;
+      if (!belongsToConversation) return;
+
+      messageQueue = messageQueue.then(async () => {
+        const normalized = await normalizeChatMessage(message);
+        if (isActive) onMessageRef.current(normalized);
+      });
     };
     const handleError = (payload: { message?: string }) => {
       onErrorRef.current(payload?.message || 'The real-time connection encountered an error.');
@@ -46,6 +60,7 @@ export const usePrivateChatSocket = (
     else socket.connect();
 
     return () => {
+      isActive = false;
       socket.off('connect', joinConversation);
       socket.off('disconnect', handleDisconnect);
       socket.off('newPrivateMessage', handleMessage);
@@ -58,7 +73,10 @@ export const usePrivateChatSocket = (
   const sendPrivateMessage = useCallback(
     (message: string) => {
       if (otherUserId) {
-        socketRef.current.emit('sendPrivateMessage', { receiverId: otherUserId, message });
+        socketRef.current.emit('sendPrivateMessage', {
+          receiverId: otherUserId,
+          message: { text: message }
+        });
       }
     },
     [otherUserId]

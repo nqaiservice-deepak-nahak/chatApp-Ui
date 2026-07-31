@@ -1,10 +1,11 @@
-import { ArrowLeftOutlined } from '@ant-design/icons';
-import { Alert, Button, Card, Descriptions, Layout, Spin, Typography } from 'antd';
+import { ArrowLeftOutlined, GlobalOutlined, LockOutlined } from '@ant-design/icons';
+import { Alert, Button, Card, Descriptions, Empty, Layout, Spin, Tag, Typography } from 'antd';
 import { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import AppHeader from '../../layout/AppHeader';
 import { clearGroupDetails, clearGroupsError, fetchGroupDetailsThunk, joinGroupThunk } from '../../../redux/features/groups/groups.slice';
 import { useAppDispatch, useAppSelector } from '../../../redux/hooks';
+import { parseApiDate } from '../../../shared/shared-functions';
 
 const { Content } = Layout;
 const { Title, Paragraph } = Typography;
@@ -41,16 +42,31 @@ export default function GroupDetails() {
 
           {error && <Alert type="error" message={error} showIcon closable className="form-alert" onClose={() => dispatch(clearGroupsError())} />}
 
-          {detailsLoading || !groupDetails ? (
+          {detailsLoading ? (
             <Spin />
+          ) : !groupDetails ? (
+            <Empty description="Group details are unavailable." />
           ) : (
             <>
-              <Title level={3}>{groupDetails.name}</Title>
+              <Title level={3}>
+                {groupDetails.name}{' '}
+                <Tag
+                  color={groupDetails.type === 'private' ? 'purple' : 'green'}
+                  icon={groupDetails.type === 'private' ? <LockOutlined /> : <GlobalOutlined />}
+                >
+                  {groupDetails.type === 'private' ? 'Private' : 'Public'}
+                </Tag>
+              </Title>
               {groupDetails.description && <Paragraph type="secondary">{groupDetails.description}</Paragraph>}
 
               <Descriptions column={1} bordered size="small" className="details-list">
                 <Descriptions.Item label="Created By">{groupDetails.createdByName}</Descriptions.Item>
-                <Descriptions.Item label="Created Date">{groupDetails.createdOn}</Descriptions.Item>
+                <Descriptions.Item label="Visibility">
+                  {groupDetails.type === 'private' ? 'Invite only' : 'Discoverable by everyone'}
+                </Descriptions.Item>
+                <Descriptions.Item label="Created Date">
+                  {parseApiDate(groupDetails.createdOn).toLocaleString()}
+                </Descriptions.Item>
                 {typeof groupDetails.totalMembers === 'number' && (
                   <Descriptions.Item label="Total Members">{groupDetails.totalMembers}</Descriptions.Item>
                 )}

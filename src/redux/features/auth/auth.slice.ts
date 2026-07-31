@@ -2,11 +2,18 @@ import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { AppApiResponse, User } from '../../../@types';
 import API from '../../../config/axios.config';
 import { API_ENDPOINTS } from '../../../shared/api-endpoints';
-import { clearStoredSession, getStoredToken, getStoredUser, setStoredSession } from '../../../shared/shared-functions';
+import {
+  clearStoredSession,
+  getStoredAesKey,
+  getStoredToken,
+  getStoredUser,
+  setStoredSession
+} from '../../../shared/shared-functions';
 
 interface AuthState {
   user: User | null;
   accessToken: string | null;
+  aesKey: string | null;
   loginLoading: boolean;
   registerLoading: boolean;
   usersLoading: boolean;
@@ -17,11 +24,18 @@ interface AuthState {
 const initialState: AuthState = {
   user: getStoredUser(),
   accessToken: getStoredToken(),
+  aesKey: getStoredAesKey(),
   loginLoading: false,
   registerLoading: false,
   usersLoading: false,
   availableUsers: [],
   error: null
+};
+
+const getErrorMessage = (error: any, fallback: string): string => {
+  const message = error?.response?.data?.message;
+  if (Array.isArray(message)) return message.join(' ');
+  return typeof message === 'string' && message.trim() ? message : fallback;
 };
 
 //#region Thunks
@@ -32,17 +46,21 @@ export const registerThunk = createAsyncThunk(
       const res = await API.post<AppApiResponse>(API_ENDPOINTS.REGISTER, body);
       return res.data;
     } catch (error: any) {
-      return rejectWithValue(error?.response?.data?.message || 'Registration failed. Please try again.');
+      return rejectWithValue(getErrorMessage(error, 'Registration failed. Please try again.'));
     }
   }
 );
 
 export const loginThunk = createAsyncThunk('auth/login', async (body: { email: string; password: string }, { rejectWithValue }) => {
   try {
-    const res = await API.post<AppApiResponse<{ accessToken: string; user: User }>>(API_ENDPOINTS.LOGIN, body);
-    return res.data.data!;
+    const res = await API.post<AppApiResponse<{ accessToken: string; aesKey: string; user: User }>>(API_ENDPOINTS.LOGIN, body);
+    const session = res.data.data;
+    if (!session?.accessToken || !session.aesKey || !session.user) {
+      return rejectWithValue('The login response did not include a complete secure session.');
+    }
+    return session;
   } catch (error: any) {
-    return rejectWithValue(error?.response?.data?.message || 'Invalid email or password.');
+    return rejectWithValue(getErrorMessage(error, 'Invalid email or password.'));
   }
 });
 
@@ -51,7 +69,7 @@ export const fetchAvailableUsersThunk = createAsyncThunk('auth/fetchAvailableUse
     const res = await API.get<AppApiResponse<User[]>>(API_ENDPOINTS.AVAILABLE_USERS);
     return res.data.data || [];
   } catch (error: any) {
-    return rejectWithValue(error?.response?.data?.message || 'Failed to load people.');
+    return rejectWithValue(getErrorMessage(error, 'Failed to load people.'));
   }
 });
 //#endregion Thunks
@@ -64,6 +82,7 @@ const authSlice = createSlice({
       clearStoredSession();
       state.user = null;
       state.accessToken = null;
+      state.aesKey = null;
     },
     clearAuthError: (state) => {
       state.error = null;
@@ -90,7 +109,8 @@ const authSlice = createSlice({
         state.loginLoading = false;
         state.user = action.payload.user;
         state.accessToken = action.payload.accessToken;
-        setStoredSession(action.payload.accessToken, action.payload.user);
+        state.aesKey = action.payload.aesKey;
+        setStoredSession(action.payload.accessToken, action.payload.user, action.payload.aesKey);
       })
       .addCase(loginThunk.rejected, (state, action: PayloadAction<any>) => {
         state.loginLoading = false;

@@ -1,5 +1,17 @@
 import {
+  ArrowRightOutlined,
+  GlobalOutlined,
+  LockOutlined,
+  MessageOutlined,
+  PlusCircleOutlined,
+  ReloadOutlined,
+  SearchOutlined,
+  TeamOutlined,
+  UserOutlined,
+} from "@ant-design/icons";
+import {
   Alert,
+  Badge,
   Button,
   Card,
   Col,
@@ -9,140 +21,255 @@ import {
   Layout,
   List,
   Row,
+  Select,
   Spin,
+  Tag,
   Typography,
 } from "antd";
-import {
-  MessageOutlined,
-  TeamOutlined,
-  PlusCircleOutlined,
-  UserOutlined,
-  ArrowRightOutlined,
-  SearchOutlined,
-  ReloadOutlined,
-} from "@ant-design/icons";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import AppHeader from "../../layout/AppHeader";
-
+import type { ChatListItem, GroupType } from "../../../@types";
+import {
+  clearAuthError,
+  fetchAvailableUsersThunk,
+} from "../../../redux/features/auth/auth.slice";
 import {
   clearGroupsError,
   createGroupThunk,
   fetchAvailableGroupsThunk,
   fetchMyGroupsThunk,
+  searchPublicGroupsThunk,
 } from "../../../redux/features/groups/groups.slice";
-
+import {
+  clearMessagesError,
+  fetchChatsThunk,
+} from "../../../redux/features/messages/messages.slice";
 import { useAppDispatch, useAppSelector } from "../../../redux/hooks";
-import { fetchAvailableUsersThunk } from "../../../redux/features/auth/auth.slice";
-
+import { parseApiDate } from "../../../shared/shared-functions";
+import { useChatListSocket } from "../../../socket/useChatListSocket";
+import AppHeader from "../../layout/AppHeader";
 import "./dashboard.css";
 
 const { Content } = Layout;
 const { Title, Text } = Typography;
 const { TextArea } = Input;
 
+interface CreateGroupValues {
+  name: string;
+  description?: string;
+  type: GroupType;
+  memberIds?: string[];
+}
+
+const formatChatTime = (value?: string | null): string => {
+  if (!value) return "";
+
+  const date = parseApiDate(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const today = new Date();
+  const isToday =
+    date.getFullYear() === today.getFullYear() &&
+    date.getMonth() === today.getMonth() &&
+    date.getDate() === today.getDate();
+
+  return isToday
+    ? date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    : date.toLocaleDateString([], { day: "2-digit", month: "short" });
+};
+
+const getChatRoute = (chat: ChatListItem): string => {
+  if (chat.chatType === "private") {
+    return `/messages/${chat.directDetails?.otherUserId || chat.id}`;
+  }
+
+  return `/chat/${chat.id}`;
+};
+
 export default function Dashboard() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
-
-  const {
-    myGroups,
-    availableGroups,
-    listLoading,
-    createLoading,
-    error,
-  } = useAppSelector((state) => state.groups);
-
-  const [form] = Form.useForm();
+  const [form] = Form.useForm<CreateGroupValues>();
   const [groupSearch, setGroupSearch] = useState("");
   const [peopleSearch, setPeopleSearch] = useState("");
-  const { user, availableUsers, usersLoading } = useAppSelector((state) => state.auth);
-  const filteredMyGroups = useMemo(() => {
-    const query = groupSearch.trim().toLowerCase();
-    if (!query) return myGroups;
-    return myGroups.filter(
-      (group) =>
-        group.name.toLowerCase().includes(query) ||
-        group.description?.toLowerCase().includes(query)
-    );
-  }, [myGroups, groupSearch]);
-  const filteredAvailableGroups = useMemo(() => {
-    const query = groupSearch.trim().toLowerCase();
-    if (!query) return availableGroups;
-    return availableGroups.filter(
-      (group) =>
-        group.name.toLowerCase().includes(query) ||
-        group.description?.toLowerCase().includes(query)
-    );
-  }, [availableGroups, groupSearch]);
+  const [createWarning, setCreateWarning] = useState("");
+
+  const {
+    availableGroups,
+    searchResults,
+    listLoading,
+    availableLoading,
+    searchLoading,
+    createLoading,
+    error,
+    availableError,
+    searchError,
+  } = useAppSelector((state) => state.groups);
+  const {
+    chatList,
+    chatsLoading,
+    error: messagesError,
+  } = useAppSelector((state) => state.messages);
+  const {
+    user,
+    availableUsers,
+    usersLoading,
+    error: authError,
+  } = useAppSelector((state) => state.auth);
+
+  const normalizedGroupSearch = groupSearch.trim();
+  const displayedAvailableGroups = normalizedGroupSearch ? searchResults : availableGroups;
+  const discoveryLoading = normalizedGroupSearch ? searchLoading : availableLoading;
+
   const filteredUsers = useMemo(() => {
     const query = peopleSearch.trim().toLowerCase();
     if (!query) return availableUsers;
+
     return availableUsers.filter(
-      (person) => person.name.toLowerCase().includes(query) || person.email.toLowerCase().includes(query)
+      (person) =>
+        person.name.toLowerCase().includes(query) ||
+        person.email.toLowerCase().includes(query),
     );
   }, [availableUsers, peopleSearch]);
 
-  useEffect(() => {
-    dispatch(fetchMyGroupsThunk());
-    dispatch(fetchAvailableGroupsThunk());
-    dispatch(fetchAvailableUsersThunk());
+  const memberOptions = useMemo(() => {
+    const candidates = new Map<string, { value: string; label: string }>();
+
+    const addCandidate = (id: string | undefined, name: string | undefined, email?: string) => {
+      if (!id || id === user?.id || candidates.has(id)) return;
+      const displayName = name?.trim() || "Unknown user";
+      candidates.set(id, {
+        value: id,
+        label: email ? `${displayName} — ${email}` : displayName,
+      });
+    };
+
+    availableUsers.forEach((person) => addCandidate(person.id, person.name, person.email));
+    chatList.forEach((chat) => {
+      if (chat.chatType !== "private") return;
+      const details = chat.directDetails;
+      addCandidate(
+        details?.otherUserId || chat.id,
+        details?.otherUserName || chat.name,
+        details?.otherUserEmail || chat.description || undefined,
+      );
+    });
+
+    return Array.from(candidates.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [availableUsers, chatList, user?.id]);
+
+  const unreadTotal = useMemo(
+    () => chatList.reduce((total, chat) => total + (chat.unreadCount || 0), 0),
+    [chatList],
+  );
+
+  const refreshChats = useCallback(() => {
+    dispatch(fetchChatsThunk());
   }, [dispatch]);
 
-  const refreshDashboard = () => {
+  useChatListSocket(refreshChats);
+
+  useEffect(() => {
+    refreshChats();
     dispatch(fetchMyGroupsThunk());
-    dispatch(fetchAvailableGroupsThunk());
     dispatch(fetchAvailableUsersThunk());
-  };
+  }, [dispatch, refreshChats]);
 
-  const handleCreateGroup = async (values: {
-    name: string;
-    description?: string;
-  }) => {
-    const result = await dispatch(createGroupThunk(values));
 
-    if (createGroupThunk.fulfilled.match(result)) {
-      form.resetFields();
+  useEffect(() => {
+    if (!normalizedGroupSearch) {
+      dispatch(fetchAvailableGroupsThunk());
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      dispatch(searchPublicGroupsThunk(normalizedGroupSearch));
+    }, 350);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [dispatch, normalizedGroupSearch]);
+
+  const refreshDashboard = () => {
+    dispatch(fetchChatsThunk());
+    dispatch(fetchMyGroupsThunk());
+    dispatch(fetchAvailableUsersThunk());
+
+    if (normalizedGroupSearch) {
+      dispatch(searchPublicGroupsThunk(normalizedGroupSearch));
+    } else {
       dispatch(fetchAvailableGroupsThunk());
     }
   };
+
+  const handleCreateGroup = async (values: CreateGroupValues) => {
+    setCreateWarning("");
+
+    const result = await dispatch(
+      createGroupThunk({
+        ...values,
+        name: values.name.trim(),
+        description: values.description?.trim() || undefined,
+        memberIds: values.memberIds?.length ? values.memberIds : undefined,
+      }),
+    );
+
+    if (createGroupThunk.fulfilled.match(result)) {
+      const failedInvites = result.payload.memberAddSummary.filter((item) => !item.ok).length;
+      if (failedInvites > 0) {
+        setCreateWarning(
+          `The group was created, but ${failedInvites} invitation${failedInvites === 1 ? "" : "s"} could not be added.`,
+        );
+      }
+
+      form.resetFields();
+      dispatch(fetchChatsThunk());
+      dispatch(fetchMyGroupsThunk());
+
+      if (normalizedGroupSearch) {
+        dispatch(searchPublicGroupsThunk(normalizedGroupSearch));
+      } else {
+        dispatch(fetchAvailableGroupsThunk());
+      }
+    }
+  };
+
+  const refreshing =
+    chatsLoading ||
+    listLoading ||
+    availableLoading ||
+    searchLoading ||
+    usersLoading;
+  const dashboardError = error || searchError || availableError || messagesError || authError;
 
   return (
     <Layout className="dashboard-layout">
       <AppHeader />
 
       <Content className="dashboard-content">
-
-        {/* HERO */}
-
         <div className="hero-section">
-
           <div>
-
-            <Title level={2}>
-              Welcome back, {user?.name || "there"}
-            </Title>
-
+            <Title level={2}>Welcome back, {user?.name || "there"}</Title>
             <Text>
-              Continue a group conversation or connect privately with a teammate.
+              Pick up a conversation, discover a public group, or start something new.
             </Text>
-
           </div>
 
           <div className="hero-actions">
             <Input
               allowClear
+              maxLength={150}
               value={groupSearch}
               onChange={(event) => setGroupSearch(event.target.value)}
               prefix={<SearchOutlined />}
-              placeholder="Search conversations"
-              aria-label="Search groups"
+              suffix={searchLoading ? <Spin size="small" /> : undefined}
+              placeholder="Search public groups"
+              aria-label="Search public groups"
               className="group-search"
             />
             <Button
-              icon={<ReloadOutlined spin={listLoading || usersLoading} />}
+              icon={<ReloadOutlined spin={refreshing} />}
               onClick={refreshDashboard}
-              disabled={listLoading || usersLoading}
+              disabled={refreshing}
               className="refresh-btn"
             >
               Refresh
@@ -150,151 +277,224 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {error && (
+        {dashboardError && (
           <Alert
             type="error"
-            message={error}
+            message={dashboardError}
             showIcon
             closable
             className="dashboard-alert"
-            onClose={() => dispatch(clearGroupsError())}
+            onClose={() => {
+              dispatch(clearGroupsError());
+              dispatch(clearMessagesError());
+              dispatch(clearAuthError());
+            }}
+          />
+        )}
+
+        {createWarning && (
+          <Alert
+            type="warning"
+            message={createWarning}
+            showIcon
+            closable
+            className="dashboard-alert"
+            onClose={() => setCreateWarning("")}
           />
         )}
 
         <Row gutter={[24, 24]}>
           <Col span={24}>
             <div className="dashboard-stats" aria-label="Workspace overview">
-              <div className="stat-card"><strong>{myGroups.length}</strong><span>Joined groups</span></div>
-              <div className="stat-card"><strong>{availableGroups.length}</strong><span>Groups to discover</span></div>
-              <div className="stat-card"><strong>{availableUsers.length}</strong><span>People available</span></div>
+              <div className="stat-card">
+                <strong>{chatList.length}</strong>
+                <span>Active chats</span>
+              </div>
+              <div className="stat-card">
+                <strong>{unreadTotal}</strong>
+                <span>Unread messages</span>
+              </div>
+              <div className="stat-card">
+                <strong>{displayedAvailableGroups.length}</strong>
+                <span>{normalizedGroupSearch ? "Search matches" : "Groups to discover"}</span>
+              </div>
+              <div className="stat-card">
+                <strong>{availableUsers.length}</strong>
+                <span>New people</span>
+              </div>
             </div>
           </Col>
 
-          {/* MY CHATS */}
-
           <Col xs={24} xl={12}>
-
             <Card
               className="glass-card"
               title={
                 <div className="card-title blue">
-
                   <div className="title-icon">
                     <MessageOutlined />
                   </div>
-
                   <span>My Chats</span>
-
                 </div>
               }
             >
-
-              {listLoading ? (
+              {chatsLoading ? (
                 <div className="loader-box">
                   <Spin size="large" />
                 </div>
-              ) : filteredMyGroups.length === 0 ? (
-                <Empty description={groupSearch ? "No joined groups match your search." : "No joined groups yet."} />
+              ) : chatList.length === 0 ? (
+                <Empty description="No conversations yet. Join a group or message someone below." />
               ) : (
                 <List
-                  dataSource={filteredMyGroups}
-                  renderItem={(group) => (
-                    <List.Item
-                      className="group-item"
-                      onClick={() => navigate(`/chat/${group._id}`)}
-                    >
-                      <List.Item.Meta
-                        avatar={
-                          <div className="avatar avatar-blue">
-                            <UserOutlined />
-                          </div>
-                        }
-                        title={group.name}
-                        description={group.description}
-                      />
+                  dataSource={chatList}
+                  renderItem={(chat) => {
+                    const groupType = chat.groupDetails?.type || "public";
+                    const lastMessageTime = formatChatTime(chat.lastMessageAt);
 
-                      <ArrowRightOutlined className="arrow" />
-
-                    </List.Item>
-                  )}
+                    return (
+                      <List.Item
+                        className="group-item chat-list-item"
+                        onClick={() => navigate(getChatRoute(chat))}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            navigate(getChatRoute(chat));
+                          }
+                        }}
+                        role="button"
+                        tabIndex={0}
+                      >
+                        <List.Item.Meta
+                          avatar={
+                            <Badge
+                              count={chat.unreadCount}
+                              overflowCount={99}
+                              size="small"
+                              offset={[-2, 3]}
+                            >
+                              <div
+                                className={`avatar ${
+                                  chat.chatType === "private" ? "avatar-cyan" : "avatar-blue"
+                                }`}
+                              >
+                                {chat.chatType === "private" ? <UserOutlined /> : <TeamOutlined />}
+                              </div>
+                            </Badge>
+                          }
+                          title={
+                            <div className="chat-title-row">
+                              <span>{chat.name}</span>
+                              <Tag
+                                bordered={false}
+                                className={`type-tag ${
+                                  chat.chatType === "private" ? "type-direct" : `type-${groupType}`
+                                }`}
+                              >
+                                {chat.chatType === "private" ? "Direct" : groupType}
+                              </Tag>
+                            </div>
+                          }
+                          description={
+                            <div className="chat-description">
+                              <span className={!chat.lastMessagePreview ? "empty-preview" : undefined}>
+                                {chat.lastMessagePreview ||
+                                  chat.description ||
+                                  "No messages yet"}
+                              </span>
+                              {lastMessageTime && (
+                                <time dateTime={chat.lastMessageAt || undefined}>
+                                  {lastMessageTime}
+                                </time>
+                              )}
+                            </div>
+                          }
+                        />
+                        <ArrowRightOutlined className="arrow" />
+                      </List.Item>
+                    );
+                  }}
                 />
               )}
-
             </Card>
-
           </Col>
 
-          {/* AVAILABLE GROUPS */}
-
           <Col xs={24} xl={12}>
-
             <Card
               className="glass-card"
               title={
                 <div className="card-title green">
-
                   <div className="title-icon">
                     <TeamOutlined />
                   </div>
-
-                  <span>Available Groups</span>
-
+                  <span>Discover Public Groups</span>
                 </div>
               }
             >
-
-              {listLoading ? (
+              {discoveryLoading ? (
                 <div className="loader-box">
                   <Spin size="large" />
                 </div>
-              ) : filteredAvailableGroups.length === 0 ? (
-                <Empty description={groupSearch ? "No available groups match your search." : "No available groups."} />
+              ) : displayedAvailableGroups.length === 0 ? (
+                <Empty
+                  description={
+                    normalizedGroupSearch
+                      ? `No public groups match “${normalizedGroupSearch}”.`
+                      : "No public groups are available right now."
+                  }
+                />
               ) : (
                 <List
-                  dataSource={filteredAvailableGroups}
+                  dataSource={displayedAvailableGroups}
                   renderItem={(group) => (
                     <List.Item
                       className="group-item"
                       onClick={() => navigate(`/groups/${group._id}`)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          navigate(`/groups/${group._id}`);
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
                     >
                       <List.Item.Meta
                         avatar={
                           <div className="avatar avatar-green">
-                            <TeamOutlined />
+                            <GlobalOutlined />
                           </div>
                         }
-                        title={group.name}
+                        title={
+                          <div className="chat-title-row">
+                            <span>{group.name}</span>
+                            <Tag bordered={false} className="type-tag type-public">
+                              public
+                            </Tag>
+                          </div>
+                        }
                         description={
-                          <>
-                            <div>{group.description}</div>
-
-                            <Text type="secondary" style={{color:'white'}}>
-                              Created by {group.createdByName}
-                            </Text>
-                          </>
+                          <div className="available-group-copy">
+                            {group.description && <span>{group.description}</span>}
+                            <small>Created by {group.createdByName}</small>
+                          </div>
                         }
                       />
-
                       <ArrowRightOutlined className="arrow" />
-
                     </List.Item>
                   )}
                 />
               )}
-
             </Card>
-
           </Col>
-
-          {/* DIRECT MESSAGES */}
 
           <Col span={24}>
             <Card
               className="glass-card people-card"
               title={
                 <div className="card-title cyan">
-                  <div className="title-icon"><UserOutlined /></div>
-                  <span>Direct Messages</span>
+                  <div className="title-icon">
+                    <UserOutlined />
+                  </div>
+                  <span>Start a Direct Message</span>
                 </div>
               }
               extra={
@@ -310,17 +510,30 @@ export default function Dashboard() {
               }
             >
               {usersLoading ? (
-                <div className="loader-box"><Spin size="large" /></div>
+                <div className="loader-box">
+                  <Spin size="large" />
+                </div>
               ) : filteredUsers.length === 0 ? (
-                <Empty description={peopleSearch ? "No people match your search." : "No other users are available yet."} />
+                <Empty
+                  description={
+                    peopleSearch
+                      ? "No new people match your search."
+                      : "Everyone available is already in your chats."
+                  }
+                />
               ) : (
                 <List
                   grid={{ gutter: 16, xs: 1, sm: 2, lg: 3 }}
                   dataSource={filteredUsers}
                   renderItem={(person) => (
                     <List.Item>
-                      <button className="person-card" onClick={() => navigate(`/messages/${person.id}`)}>
-                        <div className="avatar avatar-cyan"><UserOutlined /></div>
+                      <button
+                        className="person-card"
+                        onClick={() => navigate(`/messages/${person.id}`)}
+                      >
+                        <div className="avatar avatar-cyan">
+                          <UserOutlined />
+                        </div>
                         <div className="person-copy">
                           <strong>{person.name}</strong>
                           <span>{person.email}</span>
@@ -334,65 +547,104 @@ export default function Dashboard() {
             </Card>
           </Col>
 
-          {/* CREATE GROUP */}
-
           <Col span={24}>
-
             <Card
               className="glass-card create-card"
               title={
                 <div className="card-title purple">
-
                   <div className="title-icon">
                     <PlusCircleOutlined />
                   </div>
-
                   <span>Create New Group</span>
-
                 </div>
               }
             >
-
               <Row gutter={30}>
-
                 <Col xs={24} lg={14}>
-
-                  <Form
+                  <Form<CreateGroupValues>
                     form={form}
                     layout="vertical"
                     requiredMark={false}
+                    initialValues={{ type: "public", memberIds: [] }}
                     onFinish={handleCreateGroup}
                   >
-
                     <Form.Item
                       label="Group Name"
                       name="name"
                       rules={[
-                        {
-                          required: true,
-                          message: "Please enter group name",
-                        },
+                        { required: true, whitespace: true, message: "Please enter a group name." },
+                        { max: 150, message: "Group names can be up to 150 characters." },
                       ]}
                     >
-
-                      <Input
-                        size="large"
-                        placeholder="Enter group name"
-                      />
-
+                      <Input size="large" placeholder="Enter group name" maxLength={150} />
                     </Form.Item>
 
                     <Form.Item
                       label="Description"
                       name="description"
+                      rules={[
+                        { max: 1000, message: "Descriptions can be up to 1,000 characters." },
+                      ]}
                     >
-
                       <TextArea
                         rows={5}
-                        placeholder="Write something about your group..."
+                        placeholder="What will this group be about?"
+                        maxLength={1000}
+                        showCount
                       />
-
                     </Form.Item>
+
+                    <Row gutter={16}>
+                      <Col xs={24} md={9}>
+                        <Form.Item label="Visibility" name="type">
+                          <Select
+                            className="dashboard-select"
+                            options={[
+                              {
+                                value: "public",
+                                label: (
+                                  <span className="select-option">
+                                    <GlobalOutlined /> Public
+                                  </span>
+                                ),
+                              },
+                              {
+                                value: "private",
+                                label: (
+                                  <span className="select-option">
+                                    <LockOutlined /> Private
+                                  </span>
+                                ),
+                              },
+                            ]}
+                          />
+                        </Form.Item>
+                      </Col>
+
+                      <Col xs={24} md={15}>
+                        <Form.Item
+                          label="Invite members"
+                          name="memberIds"
+                          tooltip="Optional. You can invite up to 100 people now and add more later."
+                        >
+                          <Select
+                            mode="multiple"
+                            allowClear
+                            className="dashboard-select member-select"
+                            optionFilterProp="label"
+                            options={memberOptions}
+                            maxCount={100}
+                            maxTagCount="responsive"
+                            placeholder={
+                              memberOptions.length
+                                ? "Choose people to invite"
+                                : "No people available to invite"
+                            }
+                            disabled={!memberOptions.length}
+                          />
+                        </Form.Item>
+                      </Col>
+                    </Row>
 
                     <Button
                       htmlType="submit"
@@ -401,45 +653,33 @@ export default function Dashboard() {
                     >
                       Create Group
                     </Button>
-
                   </Form>
-
                 </Col>
 
-                <Col
-                  xs={24}
-                  lg={10}
-                  className="create-info"
-                >
-
+                <Col xs={24} lg={10} className="create-info">
                   <div className="info-box">
-
                     <PlusCircleOutlined className="info-icon" />
-
-                    <Title level={4}>
-                      Build Your Community
-                    </Title>
-
+                    <Title level={4}>Bring the right people together</Title>
                     <Text>
-                      Create a new group and invite members to collaborate,
-                      discuss ideas, share updates and communicate instantly
-                      using real-time messaging.
+                      Public groups can be discovered and joined by anyone. Private groups stay
+                      out of discovery, so invite the people who should have access when you
+                      create one.
                     </Text>
-
+                    <div className="visibility-hints">
+                      <span>
+                        <GlobalOutlined /> Public and discoverable
+                      </span>
+                      <span>
+                        <LockOutlined /> Private and invite-only
+                      </span>
+                    </div>
                   </div>
-
                 </Col>
-
               </Row>
-
             </Card>
-
           </Col>
-
         </Row>
-
       </Content>
-
     </Layout>
   );
 }
