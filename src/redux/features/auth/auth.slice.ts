@@ -1,5 +1,10 @@
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { AppApiResponse, User } from '../../../@types';
+import {
+  AppApiResponse,
+  PaginatedResponse,
+  PaginatedSearchRequest,
+  User
+} from '../../../@types';
 import API from '../../../config/axios.config';
 import { API_ENDPOINTS } from '../../../shared/api-endpoints';
 import {
@@ -18,6 +23,7 @@ interface AuthState {
   registerLoading: boolean;
   usersLoading: boolean;
   availableUsers: User[];
+  availableUsersTotalCount: number;
   error: string | null;
 }
 
@@ -29,6 +35,7 @@ const initialState: AuthState = {
   registerLoading: false,
   usersLoading: false,
   availableUsers: [],
+  availableUsersTotalCount: 0,
   error: null
 };
 
@@ -64,14 +71,24 @@ export const loginThunk = createAsyncThunk('auth/login', async (body: { email: s
   }
 });
 
-export const fetchAvailableUsersThunk = createAsyncThunk('auth/fetchAvailableUsers', async (_: void, { rejectWithValue }) => {
-  try {
-    const res = await API.get<AppApiResponse<User[]>>(API_ENDPOINTS.AVAILABLE_USERS);
-    return res.data.data || [];
-  } catch (error: any) {
-    return rejectWithValue(getErrorMessage(error, 'Failed to load people.'));
+export const fetchAvailableUsersThunk = createAsyncThunk<
+  PaginatedResponse<User>,
+  PaginatedSearchRequest | void,
+  { rejectValue: string }
+>(
+  'auth/fetchAvailableUsers',
+  async (options, { rejectWithValue }) => {
+    try {
+      const res = await API.post<AppApiResponse<PaginatedResponse<User>>>(
+        API_ENDPOINTS.AVAILABLE_USERS,
+        options || { offset: 0, limit: 100 }
+      );
+      return res.data.data || { totalCount: 0, offset: 0, limit: 0, items: [] };
+    } catch (error: any) {
+      return rejectWithValue(getErrorMessage(error, 'Failed to load people.'));
+    }
   }
-});
+);
 //#endregion Thunks
 
 const authSlice = createSlice({
@@ -121,7 +138,8 @@ const authSlice = createSlice({
       })
       .addCase(fetchAvailableUsersThunk.fulfilled, (state, action) => {
         state.usersLoading = false;
-        state.availableUsers = action.payload;
+        state.availableUsers = action.payload.items;
+        state.availableUsersTotalCount = action.payload.totalCount;
       })
       .addCase(fetchAvailableUsersThunk.rejected, (state, action: PayloadAction<any>) => {
         state.usersLoading = false;

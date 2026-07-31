@@ -1,5 +1,12 @@
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { AppApiResponse, ChatListItem, ChatMessage, EncryptedChatMessage } from '../../../@types';
+import {
+  AppApiResponse,
+  ChatListItem,
+  ChatMessage,
+  EncryptedChatMessage,
+  PaginatedResponse,
+  PaginatedSearchRequest
+} from '../../../@types';
 import API from '../../../config/axios.config';
 import { API_ENDPOINTS } from '../../../shared/api-endpoints';
 import { normalizeChatMessages } from '../../../shared/message-crypto';
@@ -28,6 +35,7 @@ interface PrivateHistoryRequest {
 
 interface MessagesState {
   chatList: ChatListItem[];
+  chatTotalCount: number;
   chatHistory: ChatMessage[];
   privateChatHistory: ChatMessage[];
   chatsLoading: boolean;
@@ -42,6 +50,7 @@ interface MessagesState {
 
 const initialState: MessagesState = {
   chatList: [],
+  chatTotalCount: 0,
   chatHistory: [],
   privateChatHistory: [],
   chatsLoading: false,
@@ -74,17 +83,26 @@ const normalizeHistoryPage = async (
 });
 
 //#region Thunks
-export const fetchChatsThunk = createAsyncThunk(
+export const fetchChatsThunk = createAsyncThunk<
+  { items: ChatListItem[]; totalCount: number },
+  PaginatedSearchRequest | void,
+  { rejectValue: string }
+>(
   'messages/fetchChats',
-  async (_: void, { rejectWithValue }) => {
+  async (options, { rejectWithValue }) => {
     try {
-      const res = await API.get<AppApiResponse<ChatListItem[]>>(API_ENDPOINTS.CHATS);
-      return await Promise.all(
-        (res.data.data || []).map(async (chat) => ({
+      const res = await API.post<AppApiResponse<PaginatedResponse<ChatListItem>>>(
+        API_ENDPOINTS.CHATS,
+        options || { offset: 0, limit: 100 }
+      );
+      const page = res.data.data;
+      const items = await Promise.all(
+        (page?.items || []).map(async (chat) => ({
           ...chat,
           unreadPreview: await normalizeChatMessages(chat.unreadPreview || [])
         }))
       );
+      return { items, totalCount: page?.totalCount ?? items.length };
     } catch (error: any) {
       return rejectWithValue(getErrorMessage(error, 'Failed to load conversations.'));
     }
@@ -161,7 +179,8 @@ const messagesSlice = createSlice({
       })
       .addCase(fetchChatsThunk.fulfilled, (state, action) => {
         state.chatsLoading = false;
-        state.chatList = action.payload;
+        state.chatList = action.payload.items;
+        state.chatTotalCount = action.payload.totalCount;
       })
       .addCase(fetchChatsThunk.rejected, (state, action: PayloadAction<any>) => {
         state.chatsLoading = false;

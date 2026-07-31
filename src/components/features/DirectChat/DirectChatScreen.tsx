@@ -58,7 +58,11 @@ export default function DirectChatScreen() {
     [dispatch]
   );
   const handleSocketError = useCallback((message: string) => setSocketError(message), []);
-  const { isConnected, sendPrivateMessage } = usePrivateChatSocket(userId, handleIncomingMessage, handleSocketError);
+  const { isConnected, isOtherUserOnline, sendPrivateMessage } = usePrivateChatSocket(
+    userId,
+    handleIncomingMessage,
+    handleSocketError
+  );
 
   useEffect(() => {
     if (!availableUsers.length) dispatch(fetchAvailableUsersThunk());
@@ -139,8 +143,8 @@ export default function DirectChatScreen() {
               {otherUser?.name || (usersLoading || chatsLoading ? 'Loading conversation…' : 'Direct message')}
             </Title>
             <div className="chat-status">
-              <Badge status={isConnected ? 'success' : 'warning'} />
-              <Text>{isConnected ? 'Online connection active' : 'Reconnecting…'}</Text>
+              <Badge status={isOtherUserOnline ? 'success' : 'default'} />
+              <Text>{isOtherUserOnline ? 'Online' : 'Offline'}</Text>
             </div>
           </div>
         </div>

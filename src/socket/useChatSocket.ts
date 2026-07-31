@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChatMessage, EncryptedChatMessage } from '../@types';
+import { ChatMessage, EncryptedChatMessage, GroupPresence, GroupPresenceMember } from '../@types';
 import { normalizeChatMessage } from '../shared/message-crypto';
 import { getSocket } from './socket';
 
@@ -10,6 +10,7 @@ import { getSocket } from './socket';
  */
 export const useChatSocket = (groupId: string | undefined, onMessage: (message: ChatMessage) => void, onError: (msg: string) => void) => {
   const [isConnected, setIsConnected] = useState(false);
+  const [groupMembers, setGroupMembers] = useState<GroupPresenceMember[]>([]);
   const socketRef = useRef(getSocket());
   const onMessageRef = useRef(onMessage);
   const onErrorRef = useRef(onError);
@@ -27,11 +28,28 @@ export const useChatSocket = (groupId: string | undefined, onMessage: (message: 
     let messageQueue = Promise.resolve();
     let isActive = true;
 
+    setGroupMembers([]);
+
     const handleConnect = () => {
       setIsConnected(true);
       socket.emit('joinGroup', { groupId });
     };
     const handleDisconnect = () => setIsConnected(false);
+    const handleGroupPresence = (presence: GroupPresence) => {
+      if (presence?.groupId === groupId) {
+        setGroupMembers(presence.members || []);
+      }
+    };
+    const handlePresenceChanged = (payload: { userId?: string; isOnline?: boolean }) => {
+      if (!payload?.userId) return;
+      setGroupMembers((members) =>
+        members.map((member) =>
+          member.userId === payload.userId
+            ? { ...member, isOnline: Boolean(payload.isOnline) }
+            : member
+        )
+      );
+    };
     const handleNewMessage = (message: EncryptedChatMessage) => {
       const belongsToGroup = message.chatId
         ? message.chatId === expectedChatId
@@ -50,6 +68,8 @@ export const useChatSocket = (groupId: string | undefined, onMessage: (message: 
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
     socket.on('newMessage', handleNewMessage);
+    socket.on('groupPresence', handleGroupPresence);
+    socket.on('presenceChanged', handlePresenceChanged);
     socket.on('error', handleError);
 
     if (socket.connected) handleConnect();
@@ -61,6 +81,8 @@ export const useChatSocket = (groupId: string | undefined, onMessage: (message: 
       socket.off('connect', handleConnect);
       socket.off('disconnect', handleDisconnect);
       socket.off('newMessage', handleNewMessage);
+      socket.off('groupPresence', handleGroupPresence);
+      socket.off('presenceChanged', handlePresenceChanged);
       socket.off('error', handleError);
       socket.disconnect();
       setIsConnected(false);
@@ -71,5 +93,15 @@ export const useChatSocket = (groupId: string | undefined, onMessage: (message: 
     socketRef.current?.emit('sendMessage', { groupId, message: { text: message } });
   };
 
-  return { isConnected, sendMessage };
+  const refreshGroupPresence = () => {
+    if (groupId) socketRef.current?.emit('getGroupPresence', { groupId });
+  };
+
+  return {
+    isConnected,
+    activeMembers: groupMembers.filter((member) => member.isOnline),
+    groupMembers,
+    refreshGroupPresence,
+    sendMessage
+  };
 };
