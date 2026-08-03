@@ -11,8 +11,15 @@ const MyApp = () => {
     <ConfigProvider
       theme={{
         token: {
-          colorPrimary: '#4f46e5',
-          borderRadius: 8
+          colorPrimary: '#98006d',
+          colorInfo: '#98006d',
+          colorLink: '#98006d',
+          colorText: '#403940',
+          colorTextSecondary: '#81767d',
+          colorBorder: '#eadde3',
+          colorBgLayout: '#fff5df',
+          borderRadius: 12,
+          fontFamily: 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
         }
       }}
     >
