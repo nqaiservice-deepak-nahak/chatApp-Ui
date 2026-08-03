@@ -83,7 +83,7 @@ export default function AppHeader() {
             level={4}
             className="app-title"
           >
-            Group Chat
+            Chatter
           </Title>
 
           <Text className="app-subtitle">
@@ -125,6 +125,8 @@ export default function AppHeader() {
           danger
           icon={<LogoutOutlined />}
           className="logout-btn"
+          aria-label="Log out"
+          title="Log out"
           onClick={handleLogout}
         >
           Logout

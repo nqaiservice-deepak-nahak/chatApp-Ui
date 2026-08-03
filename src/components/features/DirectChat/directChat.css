@@ -1,19 +1,29 @@
 .direct-chat-screen .direct-avatar {
-  background: linear-gradient(135deg, #06b6d4, #2563eb);
-  box-shadow: 0 8px 22px rgba(6, 182, 212, 0.25);
+  background: linear-gradient(145deg, #d24a6d, #98006d);
+  box-shadow: 0 8px 22px rgba(152, 0, 109, 0.22);
 }
 
 .direct-email {
-  color: #94a3b8 !important;
+  color: #81767d !important;
   font-size: 13px;
 }
 
 .direct-chat-screen .chat-input .ant-input-show-count-suffix {
-  color: #64748b;
+  color: #91868d;
 }
 
 @media (max-width: 640px) {
   .direct-email {
     display: none;
   }
+}
+
+.direct-chat-screen .chat-title { max-width: min(42vw, 480px); }
+
+@media (max-width: 640px) {
+  .direct-chat-screen .chat-title { max-width: 50vw; }
+}
+
+@media (max-width: 380px) {
+  .direct-chat-screen .chat-title { max-width: 58vw; }
 }
