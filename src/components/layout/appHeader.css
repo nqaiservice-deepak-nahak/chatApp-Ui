@@ -1,242 +1,145 @@
-/* ==========================================================
-   HEADER
-========================================================== */
-
 .app-header {
-
-    position: relative;
-    z-index: 1000;
-
-    height: 82px;
-
-     line-height: normal;      /* Add this */
-
-    padding: 0 35px;
-
-    display: flex;
-
-    justify-content: space-between;
-
-    align-items: center;
-
-    background: rgba(17,24,39,.92) !important;
-
-    backdrop-filter: blur(18px);
-
-    border-bottom: 1px solid rgba(255,255,255,.08);
-
-    box-shadow:
-        0 8px 25px rgba(0,0,0,.35);
+  position: relative;
+  z-index: 1000;
+  height: 82px;
+  padding: 0 35px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.96);
+  border-bottom: 1px solid #f0e4d2;
+  box-shadow: 0 8px 26px rgba(113, 0, 81, 0.07);
+  backdrop-filter: blur(18px);
 }
 
-/* ==========================================================
-   LEFT
-========================================================== */
+.app-header > * { min-width: 0; }
+
+.header-left,
+.header-right,
+.profile-box {
+  display: flex;
+  align-items: center;
+}
 
 .header-left {
-
-    display: flex;
-
-    align-items: center;
-
-    gap: 16px;
+  height: 100%;
+  gap: 14px;
 }
 
+.header-right { gap: 16px; }
+
 .logo-box {
-    flex-shrink: 0;
-
-
-    width: 54px;
-
-    height: 54px;
-
-    border-radius: 18px;
-
-    display: flex;
-
-    justify-content: center;
-
-    align-items: center;
-
-    color: white;
-
-    font-size: 24px;
-
-    background:
-        linear-gradient(135deg,
-            #4f7cff,
-            #7c3aed);
-
-    box-shadow:
-        0 12px 28px rgba(79,124,255,.35);
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 23px;
+  border-radius: 17px;
+  background: linear-gradient(145deg, #b5107d, #710051);
+  box-shadow: 0 11px 24px rgba(152, 0, 109, 0.24);
 }
 
 .app-title {
-
-    color: white !important;
-
-    margin: 0 !important;
-    line-height: 1.1 !important;
-
-    font-weight: 700;
+  margin: 0 !important;
+  color: #403940 !important;
+  line-height: 1.1 !important;
+  font-weight: 750 !important;
 }
 
 .app-subtitle {
-
-    color: #94a3b8;
-
-    font-size: 13px;
-
-    display: block;
-    margin-top: 2px;
-
+  display: block;
+  margin-top: 3px;
+  color: #81767d;
+  font-size: 13px;
 }
 
-/* ==========================================================
-   PROFILE
-========================================================== */
-
 .profile-box {
-
-    display: flex;
-
-    align-items: center;
-
-    gap: 12px;
-
-    padding: 10px 16px;
-
-    border-radius: 16px;
-
-    background: rgba(30,41,59,.85);
-
-    border: 1px solid rgba(255,255,255,.05);
+  height: 58px;
+  gap: 11px;
+  padding: 7px 14px 7px 8px;
+  flex-shrink: 0;
+  border: 1px solid #f0e0d4;
+  border-radius: 17px;
+  background: #fff9ed;
 }
 
 .profile-avatar {
-
-    background:
-        linear-gradient(135deg,
-            #4f7cff,
-            #2563eb);
-
-    color: white;
+  color: #fff;
+  background: linear-gradient(145deg, #d24a6d, #98006d);
 }
 
 .welcome-text {
-
-    display: block;
-
-    color: #94a3b8;
-
-    font-size: 12px;
+  display: block;
+  color: #91868d;
+  font-size: 11px;
 }
 
 .username {
-
-    color: white;
-
-    font-size: 15px;
-
-    font-weight: 600;
+  max-width: 150px;
+  overflow: hidden;
+  color: #403940;
+  font-size: 14px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* ==========================================================
-   BUTTON
-========================================================== */
-
 .logout-btn {
-
-    height: 46px;
-
-    padding: 0 22px;
-
-    border-radius: 14px;
-
-    font-weight: 600;
-
-    transition: .3s;
+  height: 44px;
+  padding: 0 19px;
+  color: #98006d !important;
+  font-weight: 650;
+  border-color: #e6bfd8 !important;
+  border-radius: 13px;
+  background: #fff !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
 .logout-btn:hover {
-
-    transform: translateY(-2px);
-
-    box-shadow:
-        0 10px 20px rgba(255,77,79,.25);
+  color: #fff !important;
+  border-color: #98006d !important;
+  background: #98006d !important;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(152, 0, 109, 0.2);
 }
 
-/* ==========================================================
-   MOBILE
-========================================================== */
-
-@media(max-width:768px){
-
-    .app-header{
-
-        padding:0 18px;
-    }
-
-    .app-subtitle{
-
-        display:none;
-    }
-
-    .profile-box{
-
-        padding:8px 10px;
-    }
-
-    .username{
-
-        display:none;
-    }
-
-    .welcome-text{
-
-        display:none;
-    }
-
-    .logout-btn{
-
-        padding:0 14px;
-    }
+@media (max-width: 768px) {
+  .app-header { padding: 0 18px; }
+  .app-subtitle, .username, .welcome-text { display: none; }
+  .profile-box { height: auto; padding: 5px; border: 0; background: transparent; }
+  .header-right { gap: 8px; }
+  .logout-btn { padding: 0 13px; }
 }
 
-@media(max-width:576px){
-
-    .logo-box{
-
-        width:46px;
-
-        height:46px;
-
-        font-size:20px;
-    }
-
-    .app-title{
-
-        font-size:18px !important;
-    }
+@media (max-width: 520px) {
+  .app-header { height: 70px; padding: 0 12px; }
+  .logo-box { width: 44px; height: 44px; font-size: 20px; border-radius: 14px; }
+  .app-title { font-size: 17px !important; }
+  .profile-box { display: none; }
+  .logout-btn > span:not(.ant-btn-icon) { display: none; }
+  .logout-btn {
+    width: 44px;
+    min-width: 44px;
+    padding: 0;
+    display: inline-grid;
+    place-items: center;
+    color: #98006d !important;
+  }
+  .logout-btn .ant-btn-icon,
+  .logout-btn .anticon,
+  .logout-btn svg {
+    display: inline-flex !important;
+    color: currentColor;
+    font-size: 18px;
+  }
 }
 
-.header-right {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-}
-
-.profile-box {
-    display: flex;
-    align-items: center;
-
-    flex-shrink: 0;
-
-    height: 66px;
-}
-
-.header-left {
-    display: flex;
-    align-items: center;
-    height: 100%;
+@media (max-width: 360px) {
+  .app-header { padding-inline: 10px; }
+  .header-left { gap: 9px; }
+  .logo-box { width: 40px; height: 40px; }
+  .app-title { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .logout-btn { width: 40px; height: 40px; }
 }

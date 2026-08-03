@@ -5,7 +5,6 @@ import {
   MessageOutlined,
   PlusCircleOutlined,
   ReloadOutlined,
-  SearchOutlined,
   TeamOutlined,
   UserOutlined,
 } from "@ant-design/icons";
@@ -46,12 +45,14 @@ import {
 import { useAppDispatch, useAppSelector } from "../../../redux/hooks";
 import { parseApiDate } from "../../../shared/shared-functions";
 import { useChatListSocket } from "../../../socket/useChatListSocket";
+import SearchBar from "../../common/SearchBar";
 import AppHeader from "../../layout/AppHeader";
 import "./dashboard.css";
 
 const { Content } = Layout;
 const { Title, Text } = Typography;
 const { TextArea } = Input;
+const DESCRIPTION_CHARACTER_LIMIT = 250;
 
 interface CreateGroupValues {
   name: string;
@@ -95,7 +96,6 @@ export default function Dashboard() {
 
   const {
     availableGroups,
-    availableGroupsTotalCount,
     listLoading,
     availableLoading,
     createLoading,
@@ -152,19 +152,23 @@ export default function Dashboard() {
   );
 
   const refreshChats = useCallback(() => {
-    dispatch(fetchChatsThunk());
-  }, [dispatch]);
+    dispatch(fetchChatsThunk({
+      offset: 0,
+      limit: 100,
+      searchData: normalizedGroupSearch || undefined,
+    }));
+  }, [dispatch, normalizedGroupSearch]);
 
   useChatListSocket(refreshChats);
 
   useEffect(() => {
-    refreshChats();
     dispatch(fetchMyGroupsThunk({ offset: 0, limit: 100 }));
-  }, [dispatch, refreshChats]);
+  }, [dispatch]);
 
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
+      refreshChats();
       dispatch(
         fetchAvailableGroupsThunk({
           offset: 0,
@@ -175,14 +179,14 @@ export default function Dashboard() {
     }, 350);
 
     return () => window.clearTimeout(timeoutId);
-  }, [dispatch, normalizedGroupSearch]);
+  }, [dispatch, normalizedGroupSearch, refreshChats]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       dispatch(
         fetchAvailableUsersThunk({
           offset: 0,
-          limit: 100,
+          limit: 10,
           searchData: normalizedPeopleSearch || undefined,
         }),
       );
@@ -192,11 +196,11 @@ export default function Dashboard() {
   }, [dispatch, normalizedPeopleSearch]);
 
   const refreshDashboard = () => {
-    dispatch(fetchChatsThunk());
+    refreshChats();
     dispatch(fetchMyGroupsThunk({ offset: 0, limit: 100 }));
     dispatch(fetchAvailableUsersThunk({
       offset: 0,
-      limit: 100,
+      limit: 10,
       searchData: normalizedPeopleSearch || undefined,
     }));
     dispatch(fetchAvailableGroupsThunk({
@@ -227,7 +231,7 @@ export default function Dashboard() {
       }
 
       form.resetFields();
-      dispatch(fetchChatsThunk());
+      refreshChats();
       dispatch(fetchMyGroupsThunk({ offset: 0, limit: 100 }));
       dispatch(fetchAvailableGroupsThunk({
         offset: 0,
@@ -258,15 +262,12 @@ export default function Dashboard() {
           </div>
 
           <div className="hero-actions">
-            <Input
-              allowClear
-              maxLength={150}
+            <SearchBar
               value={groupSearch}
               onChange={(event) => setGroupSearch(event.target.value)}
-              prefix={<SearchOutlined />}
-              suffix={availableLoading ? <Spin size="small" /> : undefined}
-              placeholder="Search public groups"
-              aria-label="Search public groups"
+              loading={availableLoading || chatsLoading}
+              placeholder="Search chats and public groups"
+              aria-label="Search chats and public groups"
               className="group-search"
             />
             <Button
@@ -311,15 +312,11 @@ export default function Dashboard() {
             <div className="dashboard-stats" aria-label="Workspace overview">
               <div className="stat-card">
                 <strong>{chatTotalCount}</strong>
-                <span>Active chats</span>
+                <span>{normalizedGroupSearch ? "Chat matches" : "Active chats"}</span>
               </div>
               <div className="stat-card">
                 <strong>{unreadTotal}</strong>
                 <span>Unread messages</span>
-              </div>
-              <div className="stat-card">
-                <strong>{availableGroupsTotalCount}</strong>
-                <span>{normalizedGroupSearch ? "Search matches" : "Groups to discover"}</span>
               </div>
               <div className="stat-card">
                 <strong>{availableUsersTotalCount}</strong>
@@ -345,7 +342,13 @@ export default function Dashboard() {
                   <Spin size="large" />
                 </div>
               ) : chatList.length === 0 ? (
-                <Empty description="No conversations yet. Join a group or message someone below." />
+                <Empty
+                  description={
+                    normalizedGroupSearch
+                      ? `No chats match “${normalizedGroupSearch}”.`
+                      : "No conversations yet. Join a group or message someone below."
+                  }
+                />
               ) : (
                 <List
                   dataSource={chatList}
@@ -501,11 +504,10 @@ export default function Dashboard() {
                 </div>
               }
               extra={
-                <Input
-                  allowClear
+                <SearchBar
                   value={peopleSearch}
                   onChange={(event) => setPeopleSearch(event.target.value)}
-                  prefix={<SearchOutlined />}
+                  loading={usersLoading}
                   placeholder="Search people"
                   className="people-search"
                   aria-label="Search people"
@@ -583,16 +585,21 @@ export default function Dashboard() {
                     </Form.Item>
 
                     <Form.Item
+                      className="group-description-field"
                       label="Description"
                       name="description"
                       rules={[
-                        { max: 1000, message: "Descriptions can be up to 1,000 characters." },
+                        {
+                          max: DESCRIPTION_CHARACTER_LIMIT,
+                          message: "Descriptions can be up to 250 characters.",
+                        },
                       ]}
                     >
                       <TextArea
+                        className="group-description-input"
                         rows={5}
                         placeholder="What will this group be about?"
-                        maxLength={1000}
+                        maxLength={DESCRIPTION_CHARACTER_LIMIT}
                         showCount
                       />
                     </Form.Item>

@@ -4,12 +4,7 @@ import { getStoredToken } from '../shared/shared-functions';
 
 let socket: Socket | null = null;
 
-/**
- * Returns a singleton Socket.IO client. The JWT is (re)attached to the
- * `auth` payload every time this is called, so a freshly logged-in user
- * always connects with their current token - verified server-side by
- * ChatGateway.handleConnection.
- */
+
 export const getSocket = (): Socket => {
   const token = getStoredToken();
 
