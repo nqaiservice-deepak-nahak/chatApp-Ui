@@ -20,7 +20,7 @@ export default function Register() {
     if (registerThunk.fulfilled.match(result)) {
       messageApi.success('Registered successfully! Redirecting to login…');
       form.resetFields();
-      setTimeout(() => navigate('/login'), 1200);
+      setTimeout(() => navigate('/login'), 1500);
     }
   };
 

@@ -10,6 +10,7 @@ import { API_ENDPOINTS } from '../../../shared/api-endpoints';
 import {
   clearStoredSession,
   getStoredAesKey,
+  getStoredRefreshToken,
   getStoredToken,
   getStoredUser,
   setStoredSession
@@ -18,6 +19,7 @@ import {
 interface AuthState {
   user: User | null;
   accessToken: string | null;
+  refreshToken: string | null;
   aesKey: string | null;
   loginLoading: boolean;
   registerLoading: boolean;
@@ -30,6 +32,7 @@ interface AuthState {
 const initialState: AuthState = {
   user: getStoredUser(),
   accessToken: getStoredToken(),
+  refreshToken: getStoredRefreshToken(),
   aesKey: getStoredAesKey(),
   loginLoading: false,
   registerLoading: false,
@@ -60,9 +63,9 @@ export const registerThunk = createAsyncThunk(
 
 export const loginThunk = createAsyncThunk('auth/login', async (body: { email: string; password: string }, { rejectWithValue }) => {
   try {
-    const res = await API.post<AppApiResponse<{ accessToken: string; aesKey: string; user: User }>>(API_ENDPOINTS.LOGIN, body);
+    const res = await API.post<AppApiResponse<{ accessToken: string; refreshToken: string; aesKey: string; user: User }>>(API_ENDPOINTS.LOGIN, body);
     const session = res.data.data;
-    if (!session?.accessToken || !session.aesKey || !session.user) {
+    if (!session?.accessToken || !session.refreshToken || !session.aesKey || !session.user) {
       return rejectWithValue('The login response did not include a complete secure session.');
     }
     return session;
@@ -99,6 +102,7 @@ const authSlice = createSlice({
       clearStoredSession();
       state.user = null;
       state.accessToken = null;
+      state.refreshToken = null;
       state.aesKey = null;
     },
     clearAuthError: (state) => {
@@ -126,8 +130,9 @@ const authSlice = createSlice({
         state.loginLoading = false;
         state.user = action.payload.user;
         state.accessToken = action.payload.accessToken;
+        state.refreshToken = action.payload.refreshToken;
         state.aesKey = action.payload.aesKey;
-        setStoredSession(action.payload.accessToken, action.payload.user, action.payload.aesKey);
+        setStoredSession(action.payload.accessToken, action.payload.refreshToken, action.payload.user, action.payload.aesKey);
       })
       .addCase(loginThunk.rejected, (state, action: PayloadAction<any>) => {
         state.loginLoading = false;

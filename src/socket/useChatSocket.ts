@@ -70,20 +70,21 @@ export const useChatSocket = (groupId: string | undefined, onMessage: (message: 
     socket.on('newMessage', handleNewMessage);
     socket.on('groupPresence', handleGroupPresence);
     socket.on('presenceChanged', handlePresenceChanged);
-    socket.on('error', handleError);
+    const failureEvents = ['error', 'authFailed', 'joinGroupFailed', 'getGroupPresenceFailed', 'sendMessageFailed'];
+    failureEvents.forEach((event) => socket.on(event, handleError));
 
     if (socket.connected) handleConnect();
     else socket.connect();
 
     return () => {
       isActive = false;
-      socket.emit('leaveGroup', { groupId });
+      socket.emit('leaveGroupRoom', { groupId });
       socket.off('connect', handleConnect);
       socket.off('disconnect', handleDisconnect);
       socket.off('newMessage', handleNewMessage);
       socket.off('groupPresence', handleGroupPresence);
       socket.off('presenceChanged', handlePresenceChanged);
-      socket.off('error', handleError);
+      failureEvents.forEach((event) => socket.off(event, handleError));
       socket.disconnect();
       setIsConnected(false);
     };

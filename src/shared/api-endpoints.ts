@@ -7,6 +7,7 @@ export const API_ENDPOINTS = {
   //#region AUTH
   REGISTER: '/auth/register',
   LOGIN: '/auth/login',
+  REFRESH_TOKEN: '/auth/refresh',
   PROFILE: '/auth/me',
   AVAILABLE_USERS: '/auth/available-users',
   //#endregion AUTH
