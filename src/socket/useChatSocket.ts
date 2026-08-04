@@ -61,6 +61,9 @@ export const useChatSocket = (groupId: string | undefined, onMessage: (message: 
         if (isActive) onMessageRef.current(normalized);
       });
     };
+    const handlePresenceRefresh = (payload: { groupId?: string }) => {
+      if (payload?.groupId === groupId) socket.emit('getGroupPresence', { groupId });
+    };
     const handleError = (payload: { message?: string }) => {
       onErrorRef.current(payload?.message || 'A real-time connection error occurred.');
     };
@@ -70,6 +73,7 @@ export const useChatSocket = (groupId: string | undefined, onMessage: (message: 
     socket.on('newMessage', handleNewMessage);
     socket.on('groupPresence', handleGroupPresence);
     socket.on('presenceChanged', handlePresenceChanged);
+    socket.on('groupPresenceRefresh', handlePresenceRefresh);
     const failureEvents = ['error', 'authFailed', 'joinGroupFailed', 'getGroupPresenceFailed', 'sendMessageFailed'];
     failureEvents.forEach((event) => socket.on(event, handleError));
 
@@ -84,6 +88,7 @@ export const useChatSocket = (groupId: string | undefined, onMessage: (message: 
       socket.off('newMessage', handleNewMessage);
       socket.off('groupPresence', handleGroupPresence);
       socket.off('presenceChanged', handlePresenceChanged);
+      socket.off('groupPresenceRefresh', handlePresenceRefresh);
       failureEvents.forEach((event) => socket.off(event, handleError));
       socket.disconnect();
       setIsConnected(false);
