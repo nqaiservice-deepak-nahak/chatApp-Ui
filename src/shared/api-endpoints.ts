@@ -19,6 +19,7 @@ export const API_ENDPOINTS = {
   SEARCH_GROUPS: '/groups/search',
   GROUP_DETAILS: (groupId: string) => `/groups/${groupId}`,
   JOIN_GROUP: (groupId: string) => `/groups/${groupId}/join`,
+  LEAVE_GROUP: (groupId: string) => `/groups/${groupId}/leave`,
   AVAILABLE_GROUP_MEMBERS: (groupId: string) => `/groups/${groupId}/available-members`,
   ADD_GROUP_MEMBERS: (groupId: string) => `/groups/${groupId}/members`,
   TRANSFER_GROUP_OWNERSHIP: (groupId: string) => `/groups/${groupId}/transfer-ownership`,

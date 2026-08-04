@@ -12,8 +12,8 @@ import {
 /**
  * Central Axios instance, mirroring the reference project's
  * config/axios.config.ts. Every request automatically gets the JWT
- * attached; a 401 response automatically clears the session and sends
- * the user back to /login.
+ * attached. A 401 first refreshes the access token and retries the original
+ * request; the session is cleared only when refresh is unavailable or expired.
  */
 const API = axios.create({
   baseURL: environment.API_URL

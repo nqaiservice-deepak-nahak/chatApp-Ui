@@ -3,6 +3,7 @@ import {
   DeleteOutlined,
   GlobalOutlined,
   LockOutlined,
+  LogoutOutlined,
   MoreOutlined,
   SendOutlined,
   SwapOutlined,
@@ -47,6 +48,7 @@ import {
   deleteGroupThunk,
   fetchAvailableGroupMembersThunk,
   fetchGroupDetailsThunk,
+  leaveGroupThunk,
   transferGroupOwnershipThunk,
 } from "../../../redux/features/groups/groups.slice";
 
@@ -105,6 +107,7 @@ export default function ChatScreen() {
     addMembersError,
     transferError,
     deleteLoading,
+    leaveLoading,
     error: groupError,
   } = useAppSelector((state) => state.groups);
 
@@ -124,25 +127,7 @@ export default function ChatScreen() {
 
   const [newOwnerUserId, setNewOwnerUserId] = useState<string>();
 
-  const ownershipCandidates = useMemo(() => {
-    const candidates = new Map<string, { id: string; name: string; email: string }>();
-
-    availableUsers.forEach((candidate) => {
-      if (candidate.id !== user?.id) candidates.set(candidate.id, candidate);
-    });
-
-    chatList.forEach((chat) => {
-      if (chat.chatType !== "private" || !chat.directDetails) return;
-      const candidate = {
-        id: chat.directDetails.otherUserId,
-        name: chat.directDetails.otherUserName,
-        email: chat.directDetails.otherUserEmail,
-      };
-      if (candidate.id !== user?.id) candidates.set(candidate.id, candidate);
-    });
-
-    return Array.from(candidates.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [availableUsers, chatList, user?.id]);
+  const [leaveAfterTransfer, setLeaveAfterTransfer] = useState(false);
 
   const messagesEndRef =
     useRef<HTMLDivElement | null>(null);
@@ -174,6 +159,13 @@ export default function ChatScreen() {
       setSocketError(err);
 
     }
+  );
+
+  const groupMemberOptions = useMemo(
+    () => groupMembers
+      .filter((member) => member.userId !== user?.id)
+      .map((member) => ({ value: member.userId, label: member.userName })),
+    [groupMembers, user?.id]
   );
 
   useEffect(() => {
@@ -336,14 +328,38 @@ export default function ChatScreen() {
 
     setNewOwnerUserId(undefined);
 
+    setLeaveAfterTransfer(false);
+
     setTransferOpen(true);
 
     dispatch(clearTransferOwnershipError());
 
-    if (availableUsers.length === 0) dispatch(fetchAvailableUsersThunk());
+  };
 
-    if (chatList.length === 0) dispatch(fetchChatsThunk());
+  const handleLeaveGroup = async () => {
+    if (!groupId) return;
+    await dispatch(leaveGroupThunk(groupId)).unwrap();
+    navigate('/dashboard');
+  };
 
+  const openLeaveGroup = () => {
+    const isOwner = String(groupDetails?.createdBy) === user?.id;
+    if (isOwner) {
+      setNewOwnerUserId(undefined);
+      setLeaveAfterTransfer(true);
+      setTransferOpen(true);
+      dispatch(clearTransferOwnershipError());
+      return;
+    }
+
+    Modal.confirm({
+      title: 'Leave this group?',
+      content: 'You will stop receiving messages from this group.',
+      okText: 'Leave group',
+      cancelText: 'Cancel',
+      okButtonProps: { danger: true },
+      onOk: handleLeaveGroup,
+    });
   };
 
   const handleTransferOwnership = async () => {
@@ -356,6 +372,12 @@ export default function ChatScreen() {
         groupId,
         newOwnerUserId,
       })).unwrap();
+
+      if (leaveAfterTransfer) {
+        await dispatch(leaveGroupThunk(groupId)).unwrap();
+        navigate('/dashboard');
+        return;
+      }
 
       setTransferOpen(false);
 
@@ -487,13 +509,14 @@ export default function ChatScreen() {
 
         </div>
 
-        {groupDetails && String(groupDetails.createdBy) === user?.id && (
+        {groupDetails?.isMember && (
 
           <Dropdown
             trigger={["click"]}
             placement="bottomRight"
             menu={{
               items: [
+                ...(String(groupDetails.createdBy) === user?.id ? [
                 {
                   key: "add-members",
                   icon: <UserAddOutlined />,
@@ -506,12 +529,20 @@ export default function ChatScreen() {
                 },
                 {
                   type: "divider",
-                },
+                } as const,
                 {
                   key: "delete",
                   danger: true,
                   icon: <DeleteOutlined />,
                   label: "Delete group",
+                },
+                ] : []),
+                ...(String(groupDetails.createdBy) === user?.id ? [{ type: "divider" as const }] : []),
+                {
+                  key: "leave",
+                  danger: true,
+                  icon: <LogoutOutlined />,
+                  label: "Leave group",
                 },
               ],
               onClick: ({ key }) => {
@@ -530,6 +561,11 @@ export default function ChatScreen() {
 
                   return;
 
+                }
+
+                if (key === "leave") {
+                  openLeaveGroup();
+                  return;
                 }
 
                 if (key !== "delete") return;
@@ -551,7 +587,7 @@ export default function ChatScreen() {
               type="text"
               aria-label="Group options"
               icon={<MoreOutlined />}
-              loading={deleteLoading || addMembersLoading || transferLoading}
+              loading={deleteLoading || leaveLoading || addMembersLoading || transferLoading}
             />
 
           </Dropdown>
@@ -624,6 +660,14 @@ export default function ChatScreen() {
         ) : (
 
           chatHistory.map((m) => {
+
+            if (m.messageType === "system") {
+              return (
+                <div key={m._id} className="system-message-row">
+                  <span role="status">{m.message}</span>
+                </div>
+              );
+            }
 
             const isMine =
               m.senderId === user?.id;
@@ -810,9 +854,9 @@ export default function ChatScreen() {
       </Modal>
 
       <Modal
-        title="Transfer group ownership"
+        title={leaveAfterTransfer ? "Choose a new group administrator" : "Transfer group ownership"}
         open={transferOpen}
-        okText="Transfer ownership"
+        okText={leaveAfterTransfer ? "Transfer and leave" : "Transfer ownership"}
         cancelText="Cancel"
         confirmLoading={transferLoading}
         okButtonProps={{ danger: true, disabled: !newOwnerUserId }}
@@ -821,27 +865,26 @@ export default function ChatScreen() {
           if (transferLoading) return;
           setTransferOpen(false);
           setNewOwnerUserId(undefined);
+          setLeaveAfterTransfer(false);
         }}
       >
         <div className="group-action-modal">
           {transferError && <Alert type="error" message={transferError} showIcon />}
           <Text type="secondary">
-            Select an existing group member. After transfer, only the new owner can add members,
-            transfer ownership, or delete this group.
+            {leaveAfterTransfer
+              ? "Before leaving, assign group administration to another member. You will leave immediately after the transfer succeeds."
+              : "Select an existing group member. After transfer, only the new owner can add members, transfer ownership, or delete this group."}
           </Text>
           <Select
             allowClear
             showSearch
             value={newOwnerUserId}
-            loading={usersLoading || chatsLoading}
+            loading={!isConnected}
             placeholder="Select the new owner"
             optionFilterProp="label"
-            options={ownershipCandidates.map((candidate) => ({
-              value: candidate.id,
-              label: `${candidate.name} (${candidate.email})`,
-            }))}
+            options={groupMemberOptions}
             onChange={setNewOwnerUserId}
-            notFoundContent={usersLoading || chatsLoading ? <Spin size="small" /> : "No users found."}
+            notFoundContent={!isConnected ? <Spin size="small" /> : "No other group members found."}
           />
           <Text type="secondary" className="group-action-hint">
             The API will confirm that the selected person is already a member.
