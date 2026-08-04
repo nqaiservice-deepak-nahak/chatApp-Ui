@@ -71,7 +71,15 @@ export const usePrivateChatSocket = (
     socket.on('newPrivateMessage', handleMessage);
     socket.on('userPresence', handlePresence);
     socket.on('presenceChanged', handlePresence);
-    socket.on('error', handleError);
+    const failureEvents = [
+      'error',
+      'authFailed',
+      'joinPrivateChatFailed',
+      'userPresenceFailed',
+      'markPrivateChatReadFailed',
+      'sendPrivateMessageFailed'
+    ];
+    failureEvents.forEach((event) => socket.on(event, handleError));
 
     if (socket.connected) joinConversation();
     else socket.connect();
@@ -83,7 +91,7 @@ export const usePrivateChatSocket = (
       socket.off('newPrivateMessage', handleMessage);
       socket.off('userPresence', handlePresence);
       socket.off('presenceChanged', handlePresence);
-      socket.off('error', handleError);
+      failureEvents.forEach((event) => socket.off(event, handleError));
       socket.disconnect();
       setIsConnected(false);
     };
