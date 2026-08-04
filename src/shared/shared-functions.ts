@@ -5,6 +5,7 @@ const UTC_API_TIMESTAMP = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
 
 const clearLegacyLocalStorage = (): void => {
   localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
+  localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
   localStorage.removeItem(STORAGE_KEYS.USER);
   localStorage.removeItem(STORAGE_KEYS.AES_KEY);
 };
@@ -12,6 +13,11 @@ const clearLegacyLocalStorage = (): void => {
 export const getStoredToken = (): string | null => {
   clearLegacyLocalStorage();
   return sessionStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+};
+
+export const getStoredRefreshToken = (): string | null => {
+  clearLegacyLocalStorage();
+  return sessionStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
 };
 
 export const getStoredUser = (): User | null => {
@@ -32,15 +38,22 @@ export const getStoredAesKey = (): string | null => {
   return sessionStorage.getItem(STORAGE_KEYS.AES_KEY);
 };
 
-export const setStoredSession = (token: string, user: User, aesKey: string): void => {
+export const setStoredSession = (token: string, refreshToken: string, user: User, aesKey: string): void => {
   clearLegacyLocalStorage();
   sessionStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, token);
+  sessionStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
   sessionStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
   sessionStorage.setItem(STORAGE_KEYS.AES_KEY, aesKey);
 };
 
+export const updateStoredTokens = (accessToken: string, refreshToken: string): void => {
+  sessionStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, accessToken);
+  sessionStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
+};
+
 export const clearStoredSession = (): void => {
   sessionStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
+  sessionStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
   sessionStorage.removeItem(STORAGE_KEYS.USER);
   sessionStorage.removeItem(STORAGE_KEYS.AES_KEY);
   clearLegacyLocalStorage();

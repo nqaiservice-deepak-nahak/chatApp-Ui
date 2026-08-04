@@ -4,6 +4,10 @@ import { getStoredToken } from '../shared/shared-functions';
 
 let socket: Socket | null = null;
 
+window.addEventListener('auth:tokens-refreshed', ((event: CustomEvent<string>) => {
+  if (socket) socket.auth = { token: event.detail };
+}) as EventListener);
+
 
 export const getSocket = (): Socket => {
   const token = getStoredToken();
