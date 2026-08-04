@@ -58,6 +58,7 @@ export interface GroupsState {
   createLoading: boolean;
   detailsLoading: boolean;
   joinLoading: boolean;
+  leaveLoading: boolean;
   deleteLoading: boolean;
   searchLoading: boolean;
   membersLoading: boolean;
@@ -88,6 +89,7 @@ const initialState: GroupsState = {
   createLoading: false,
   detailsLoading: false,
   joinLoading: false,
+  leaveLoading: false,
   deleteLoading: false,
   searchLoading: false,
   membersLoading: false,
@@ -262,6 +264,18 @@ export const deleteGroupThunk = createAsyncThunk<string, string, { rejectValue: 
       return res.data.data?.groupId || groupId;
     } catch (error: any) {
       return rejectWithValue(getErrorMessage(error, 'Failed to delete group.'));
+    }
+  }
+);
+
+export const leaveGroupThunk = createAsyncThunk<string, string, { rejectValue: string }>(
+  'groups/leave',
+  async (groupId, { rejectWithValue }) => {
+    try {
+      await API.delete<AppApiResponse<{ groupId: string }>>(API_ENDPOINTS.LEAVE_GROUP(groupId));
+      return groupId;
+    } catch (error: any) {
+      return rejectWithValue(getErrorMessage(error, 'Failed to leave group.'));
     }
   }
 );
@@ -528,6 +542,19 @@ const groupsSlice = createSlice({
       .addCase(deleteGroupThunk.rejected, (state, action) => {
         state.deleteLoading = false;
         state.error = action.payload || 'Failed to delete group.';
+      })
+      .addCase(leaveGroupThunk.pending, (state) => {
+        state.leaveLoading = true;
+        state.error = null;
+      })
+      .addCase(leaveGroupThunk.fulfilled, (state, action) => {
+        state.leaveLoading = false;
+        state.myGroups = state.myGroups.filter((group) => group._id !== action.payload);
+        state.groupDetails = null;
+      })
+      .addCase(leaveGroupThunk.rejected, (state, action) => {
+        state.leaveLoading = false;
+        state.error = action.payload || 'Failed to leave group.';
       });
   }
 });

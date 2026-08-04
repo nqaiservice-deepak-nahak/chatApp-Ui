@@ -925,3 +925,22 @@
     border-radius: 0;
   }
 }
+.system-message-row {
+  display: flex;
+  justify-content: center;
+  margin: 8px 0;
+  padding: 0 16px;
+}
+
+.system-message-row span {
+  max-width: 80%;
+  padding: 5px 10px;
+  border: 1px solid rgba(112, 155, 174, 0.16);
+  border-radius: 7px;
+  background: #d9edf7;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.08);
+  color: #52666f;
+  font-size: 12.5px;
+  line-height: 1.4;
+  text-align: center;
+}
