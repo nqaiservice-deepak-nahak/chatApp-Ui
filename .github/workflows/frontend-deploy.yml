@@ -1,0 +1,55 @@
+name: Deploy Frontend to Azure Storage
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout code
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Install dependencies
+      - name: Install Dependencies
+        run: npm ci
+
+      # Replace API placeholders
+      - name: Replace Environment Placeholders
+        run: |
+          sed -i "s|{{API_URL}}|${{ secrets.VITE_API_URL }}|g" src/environments/environment.ts
+          sed -i "s|{{SOCKET_URL}}|${{ secrets.VITE_SOCKET_URL }}|g" src/environments/environment.ts
+
+      # Build React App
+      - name: Build Application
+        run: npm run build
+
+      # Azure Login
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # Upload dist to Storage Account
+      - name: Upload to Storage Account
+        run: |
+          az storage blob upload-batch \
+            --account-name chatappstorageaccount \
+            --destination '$web' \
+            --source dist \
+            --overwrite \
+            --auth-mode login
+
+      # Logout
+      - name: Azure Logout
+        run: az logout
